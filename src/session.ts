@@ -15,9 +15,14 @@ export const AUDIO_RECENT_MS = 3000;
 /** Wait this long for the Echo to connect before triggering again. */
 export const RETRIGGER_AFTER_MS = 20_000;
 export const MAX_TRIGGER_ATTEMPTS = 3;
-/** An Echo that dropped the stream gets this long to reconnect before we treat it as stopped. */
+/**
+ * An Echo that dropped the stream gets this long to reconnect before we treat
+ * it as stopped. Note: after "Alexa, stop" the Echo itself keeps the
+ * connection open for about 60 s, so this signal arrives late; Amazon's API
+ * doesn't report a skill's audio state, so there is no faster one.
+ */
 export const DROP_GRACE_MS = 3000;
-export const VOLUME_DEBOUNCE_MS = 500;
+export const VOLUME_DEBOUNCE_MS = 700;
 /** Give a freshly connected Echo a moment before changing its volume. */
 export const VOLUME_AFTER_CONNECT_MS = 1500;
 
@@ -65,6 +70,7 @@ export interface ReceiverSession {
   stoppingByUs: boolean;
   volume: number | null;
   sentVolume: number | null;
+  volumeInFlight: boolean;
   lastError: string | null;
   volumeTimer?: { cancel(): void };
   dropTimer?: { cancel(): void };
@@ -88,7 +94,7 @@ export class SessionManager {
   session(id: string): ReceiverSession {
     let s = this.sessions.get(id);
     if (!s) {
-      s = { active: false, connections: 0, connectedAt: 0, triggerAttempts: 0, lastTriggerAt: 0, suppressed: false, stoppingByUs: false, volume: null, sentVolume: null, lastError: null };
+      s = { active: false, connections: 0, connectedAt: 0, triggerAttempts: 0, lastTriggerAt: 0, suppressed: false, stoppingByUs: false, volume: null, sentVolume: null, volumeInFlight: false, lastError: null };
       this.sessions.set(id, s);
     }
     return s;
@@ -254,14 +260,27 @@ export class SessionManager {
     s.volumeTimer?.cancel();
     s.volumeTimer = this.schedule(() => {
       s.volumeTimer = undefined;
-      if (s.volume === null || s.connections === 0 || s.volume === s.sentVolume) return;
-      const volume = s.volume;
-      s.sentVolume = volume;
-      log.info("volume", { receiver: target.id, volume });
-      this.deps.setVolume(target.serial, volume).catch((err) => {
+      this.sendVolume(target, s);
+    }, delayMs);
+  }
+
+  /** At most one volume command in flight; afterwards the latest value is sent. */
+  private sendVolume(target: SessionTarget, s: ReceiverSession): void {
+    if (s.volumeInFlight || s.volume === null || s.connections === 0 || s.volume === s.sentVolume) return;
+    const volume = s.volume;
+    s.sentVolume = volume;
+    s.volumeInFlight = true;
+    log.info("volume", { receiver: target.id, volume });
+    this.deps.setVolume(target.serial, volume).then(
+      () => {
+        s.volumeInFlight = false;
+        this.sendVolume(target, s);
+      },
+      (err) => {
+        s.volumeInFlight = false;
         s.sentVolume = null;
         log.warn("volume failed", { receiver: target.id, error: errorMessage(err) });
-      });
-    }, delayMs);
+      },
+    );
   }
 }

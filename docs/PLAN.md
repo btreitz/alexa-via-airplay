@@ -52,7 +52,28 @@ Smaller findings:
 - **Cloudflare certificates:** the free certificate covers one subdomain level
   only (`bridge.example.com`, not `bridge.home.example.com`).
 - **D-Bus:** a second Shairport Sync instance can't acquire the
-  `org.gnome.ShairportSync` and MPRIS bus names.
+  `org.gnome.ShairportSync` and MPRIS bus names. Solved in milestone 3 with
+  Shairport Sync's MQTT client instead (see below).
+
+Milestone 3 findings (2026-10-19, real iPhone and Echo):
+
+- **Session events per instance via MQTT.** Each Shairport Sync instance
+  connects to a loopback-only broker inside the bridge (topic
+  `avb/<receiver>`). For AirPlay 2 it publishes `active_start`/`active_end`
+  (sender connected/left, `active_end` about 10 s after leaving),
+  `play_start`/`play_resume`, and `volume` (`-30…0` dB, `-144` = mute). There
+  is no event for pause; pauses show as missing audio. `remote` commands
+  (`pause`, `play`, …) reach the iPhone over AirPlay 2: tested.
+- **Amazon's API doesn't see skill audio.** `getPlayerInfo` and the media
+  state stay empty/`IDLE` while the skill streams; the push connection only
+  reports volume. The only "Echo stopped" signal is the stream connection
+  closing, and after "Alexa, stop" the Echo keeps it open for about 60 s
+  (through the tunnel a real client abort closes the origin connection
+  within milliseconds, so the delay is the Echo's). So "Echo stopped → pause
+  the sender" reacts about a minute late.
+- **Amazon commands per Echo must not overlap**; concurrent sequence commands
+  for one device sometimes go unanswered. The bridge serializes them and
+  coalesces volume changes.
 
 ## Architecture
 
@@ -85,8 +106,9 @@ One container with host networking (required for mDNS and NQPTP's UDP
 5. **Session logic.**
    - AirPlay starts → trigger the Echo.
    - AirPlay idle longer than a timeout → stop the Echo.
-   - Echo drops the stream ("Alexa, stop", button) → pause the sender, if
-     D-Bus control works per instance.
+   - Echo drops the stream ("Alexa, stop", button) → pause the sender via
+     Shairport Sync's per-instance MQTT remote (about 60 s delay, see above);
+     no automatic restart until the sender plays again.
    - iPhone volume → Echo volume with debouncing; Shairport Sync runs with
      `ignore_volume_control = "yes"` so the volume isn't applied twice.
 6. **Skill generator.** Produces the interaction model and `index.js` with the

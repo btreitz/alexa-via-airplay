@@ -156,7 +156,7 @@ test("a quick reconnect (replaced connection) isn't a stop", () => {
   assert.ok(!h.calls.some((c) => c.startsWith("remote")));
 });
 
-test("volume is debounced, sent only while connected, and resent on connect", () => {
+test("volume is debounced, sent only while connected, and resent on connect", async () => {
   const h = harness();
   h.sessions.onEvent("bath", "volume", "-24.00,0.00,0.00,0.00");
   h.advance(VOLUME_DEBOUNCE_MS + 1000);
@@ -164,6 +164,7 @@ test("volume is debounced, sent only while connected, and resent on connect", ()
   h.sessions.onStreamOpen("bath");
   h.advance(VOLUME_AFTER_CONNECT_MS + 1000, { audio: true });
   assert.deepEqual(h.calls.filter((c) => c.startsWith("volume")), ["volume SERIAL 20"]);
+  await new Promise((r) => setImmediate(r)); // Amazon answered
   for (const v of ["-20.08", "-19.42", "-15.00"]) h.sessions.onEvent("bath", "volume", `${v},0,0,0`);
   h.advance(VOLUME_DEBOUNCE_MS + 1000, { audio: true });
   assert.deepEqual(h.calls.filter((c) => c.startsWith("volume")), ["volume SERIAL 20", "volume SERIAL 50"]);
@@ -175,4 +176,25 @@ test("volume forwarding can be switched off", () => {
   h.sessions.onEvent("bath", "volume", "-15,0,0,0");
   h.advance(5000, { audio: true });
   assert.ok(!h.calls.some((c) => c.startsWith("volume")));
+});
+
+test("only one volume command in flight; the latest value follows", async () => {
+  const h = harness();
+  let release: () => void = () => {};
+  const sent: number[] = [];
+  (h.sessions as any).deps.setVolume = (_serial: string, v: number) => {
+    sent.push(v);
+    return new Promise<void>((resolve) => (release = resolve));
+  };
+  h.sessions.onStreamOpen("bath");
+  h.sessions.onEvent("bath", "volume", "-15,0,0,0");
+  h.advance(VOLUME_AFTER_CONNECT_MS + 1000, { audio: true });
+  h.sessions.onEvent("bath", "volume", "-9,0,0,0");
+  h.advance(VOLUME_DEBOUNCE_MS + 1000, { audio: true });
+  h.sessions.onEvent("bath", "volume", "-3,0,0,0");
+  h.advance(VOLUME_DEBOUNCE_MS + 1000, { audio: true });
+  assert.deepEqual(sent, [50]); // still waiting for Amazon
+  release();
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(sent, [50, 90]); // the intermediate 70 is skipped
 });

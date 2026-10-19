@@ -79,6 +79,7 @@ export class AlexaController extends EventEmitter {
   private remote?: AlexaRemoteInstance;
   private current: AlexaState = { status: "logged-out" };
   private amazonPage?: string;
+  private readonly queues = new Map<string, Promise<void>>();
 
   constructor(sessionFile: string) {
     super();
@@ -150,7 +151,22 @@ export class AlexaController extends EventEmitter {
     this.teardown();
   }
 
+  /**
+   * Commands to one Echo run one after another: Amazon tends to leave a
+   * command unanswered when another one for the same device is in flight.
+   */
   private sequence(serial: string, command: string, value: unknown): Promise<void> {
+    const previous = this.queues.get(serial) ?? Promise.resolve();
+    const run = previous.catch(() => {}).then(() => this.sendNow(serial, command, value));
+    const tail = run.catch(() => {});
+    this.queues.set(serial, tail);
+    void tail.then(() => {
+      if (this.queues.get(serial) === tail) this.queues.delete(serial);
+    });
+    return run;
+  }
+
+  private sendNow(serial: string, command: string, value: unknown): Promise<void> {
     const remote = this.requireReady();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`Amazon did not answer ${command} within ${COMMAND_TIMEOUT_MS / 1000} s`)), COMMAND_TIMEOUT_MS);

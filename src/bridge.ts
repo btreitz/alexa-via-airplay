@@ -206,6 +206,9 @@ export class Bridge extends EventEmitter {
   async stopEcho(serial: string): Promise<void> {
     log.info("stopping Echo", { serial });
     await this.alexa.stopPlayback(serial);
+    // A stopped Echo keeps its connection open for about a minute; end it now
+    // so the stream doesn't keep running for nobody.
+    this.receiverBySerial(serial)?.stream.dropAll();
   }
 
   receiverStatuses() {
