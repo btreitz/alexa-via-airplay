@@ -3,15 +3,19 @@
 
 import { EventEmitter } from "node:events";
 import { AlexaController } from "./alexa.ts";
+import { ClientIpResolver } from "./client-ip.ts";
 import { dataPath, type Config } from "./config.ts";
 import { DeviceMapper, LEARN_WINDOW_MS } from "./device-map.ts";
 import { errorMessage, logger } from "./log.ts";
 import { airplayDeviceIdFor, Receiver, receiverId, type ReceiverStatus } from "./receiver.ts";
+import { HomeIpMonitor } from "./public-ip.ts";
 import { launchPhrase } from "./skill.ts";
 import { StateStore, type ReceiverEntry } from "./state.ts";
 import { SystemServices, waitFor } from "./system-services.ts";
 
 const log = logger("bridge");
+/** After a trigger, the Echo may connect for this long even without an AirPlay session. */
+export const TRIGGER_GRACE_MS = 20_000;
 
 export function defaultReceiverName(echoName: string): string {
   return `${echoName} (Alexa)`;
@@ -47,6 +51,9 @@ export class Bridge extends EventEmitter {
   readonly alexa: AlexaController;
   readonly mapper: DeviceMapper;
   readonly system?: SystemServices;
+  readonly homeIp: HomeIpMonitor;
+  readonly clientIp: ClientIpResolver;
+  private readonly lastTriggerAt = new Map<string, number>();
   private readonly receivers = new Map<string, Receiver>();
   private reconciling: Promise<void> = Promise.resolve();
   mqtt?: MqttSettings;
@@ -60,6 +67,17 @@ export class Bridge extends EventEmitter {
     this.alexa = new AlexaController(dataPath(config, "alexa-session.json"));
     this.mapper = new DeviceMapper(this.store);
     if (config.manageReceivers) this.system = new SystemServices(config.runDir, config.avahiInterfaces);
+    this.homeIp = new HomeIpMonitor({
+      traceUrl: config.publicIpTraceUrl,
+      refreshSeconds: config.publicIpRefreshSeconds,
+      ipv6PrefixLength: config.ipv6PrefixLength,
+    });
+    this.clientIp = new ClientIpResolver({ header: config.clientIpHeader, trustedProxies: config.trustedProxies });
+  }
+
+  recentlyTriggered(serial: string): boolean {
+    const at = this.lastTriggerAt.get(serial);
+    return at !== undefined && Date.now() - at <= TRIGGER_GRACE_MS;
   }
 
   get publicBaseUrl(): string | undefined {
@@ -67,12 +85,15 @@ export class Bridge extends EventEmitter {
   }
 
   async start(): Promise<void> {
+    // Not awaited: an unreachable trace endpoint must not block startup (requests fail closed meanwhile).
+    void this.homeIp.start();
     await this.system?.start();
     await this.reconcile();
     await this.alexa.resume(this.store.get().amazonPage);
   }
 
   async stop(): Promise<void> {
+    this.homeIp.stop();
     this.alexa.shutdown();
     await Promise.all([...this.receivers.values()].map((r) => r.stop()));
     this.receivers.clear();
@@ -173,6 +194,7 @@ export class Bridge extends EventEmitter {
       if (!free) throw new Error("Another Echo is still being mapped; try again in a few seconds");
     }
     this.mapper.noteTrigger(serial);
+    this.lastTriggerAt.set(serial, Date.now());
     const phrase = launchPhrase(this.store.get().invocationName);
     log.info("triggering Echo", { serial, phrase });
     await this.alexa.textCommand(serial, phrase);

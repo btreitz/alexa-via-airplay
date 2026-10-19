@@ -135,6 +135,16 @@ export class Mp3Broadcaster extends EventEmitter {
     }
   }
 
+  /** Ends every current connection (a new one for the same Echo replaces them). */
+  dropAll(): number {
+    const count = this.clients.size;
+    for (const res of [...this.clients.keys()]) {
+      this.remove(res);
+      res.end();
+    }
+    return count;
+  }
+
   close(): void {
     clearTimeout(this.lingerTimer);
     for (const res of this.clients.keys()) res.end();

@@ -1,5 +1,5 @@
-// Persistent settings in /data/state.json. Contains the stream secret, so the
-// file is written with mode 0600 and must never be committed.
+// Persistent settings in /data/state.json. Contains the signing secret, so the
+// file is written with mode 0600 and must never be committed or logged.
 
 import crypto from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -19,7 +19,8 @@ export interface ReceiverEntry {
 
 export interface State {
   version: 1;
-  streamSecret: string;
+  /** HMAC key shared with the skill to sign short-lived stream URLs. Never in a URL. */
+  signingSecret: string;
   publicBaseUrl?: string;
   invocationName: string;
   amazonPage?: string;
@@ -30,23 +31,26 @@ export interface State {
   idleTimeoutSeconds: number;
   /** Forward the sender's AirPlay volume to the Echo. */
   forwardVolume: boolean;
+  /** Serve the public stream only to clients behind this home's public IP. */
+  restrictToHomeIp: boolean;
 }
 
 export const DEFAULT_INVOCATION_NAME = "my sound bridge";
 
 export function newSecret(): string {
-  return crypto.randomBytes(24).toString("base64url");
+  return crypto.randomBytes(32).toString("base64url");
 }
 
 function defaults(): State {
   return {
     version: 1,
-    streamSecret: newSecret(),
+    signingSecret: newSecret(),
     invocationName: DEFAULT_INVOCATION_NAME,
     receivers: [],
     deviceMap: {},
     idleTimeoutSeconds: 60,
     forwardVolume: true,
+    restrictToHomeIp: true,
   };
 }
 
@@ -75,13 +79,21 @@ export class StateStore extends EventEmitter {
 
   private load(): State {
     let stored: Partial<State> = {};
+    let text: string | undefined;
     try {
-      stored = JSON.parse(fs.readFileSync(this.file, "utf8"));
+      text = fs.readFileSync(this.file, "utf8");
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
     }
+    if (text !== undefined) {
+      try {
+        stored = JSON.parse(text);
+      } catch (err) {
+        throw new Error(`${this.file} is not valid JSON (${(err as Error).message}). Fix or delete it.`);
+      }
+    }
     const state = { ...defaults(), ...stored };
-    if (!stored.streamSecret) {
+    if (!stored.signingSecret) {
       this.state = state;
       this.save();
     }

@@ -16,6 +16,9 @@ async function main(): Promise<void> {
     store: bridge.store,
     mapper: bridge.mapper,
     receiverFor: (serial) => bridge.receiverBySerial(serial),
+    clientIp: bridge.clientIp,
+    homeIp: bridge.homeIp,
+    recentlyTriggered: (serial) => bridge.recentlyTriggered(serial),
   });
   const ui = new UiServer(bridge, publicServer);
 

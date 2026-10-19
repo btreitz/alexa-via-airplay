@@ -2,7 +2,7 @@
 
 A small self-hosted service with one job: make selected Echo speakers show up
 as AirPlay 2 receivers. Updated 2026-10-19 with the spike results
-(`spikes/README.md`).
+(`spikes/README.md`) and the public endpoint protection requirements.
 
 ## Decisions
 
@@ -20,7 +20,12 @@ as AirPlay 2 receivers. Updated 2026-10-19 with the spike results
   skill. The bridge generates the skill code and interaction model; the user
   pastes them into the developer console.
 - **The skill stays static.** It never calls the bridge; it answers every
-  launch with `AudioPlayer.Play` for `<public base URL>/play.mp3?d=<device ID>&k=<secret>`.
+  launch with `AudioPlayer.Play` for a freshly signed, short-lived URL:
+  `<public base URL>/play.mp3?d=<device ID>&exp=<unix now + 60 s>&sig=<HMAC-SHA256(secret, d|exp), base64url>`.
+- **Only the user's own Echos may play the stream** (security, and no public
+  redistribution of Spotify and similar content). The public listener checks
+  a signed URL, the home's public IP and an active session; see "Public
+  endpoint protection".
 
 ## What the spikes proved
 
@@ -59,9 +64,10 @@ One container with host networking (required for mDNS and NQPTP's UDP
    port, NQPTP interface name and output pipe. Changing the selection doesn't
    require editing Compose.
 2. **Stream server, two listeners:**
-   - **Public listener:** serves only `/play.mp3`. It checks the secret `k`,
-     maps `d` to an Echo and streams that Echo's receiver. Everything else
-     returns 404. This is the only port the tunnel points to.
+   - **Public listener:** serves only `/play.mp3`, and only when all checks
+     in "Public endpoint protection" pass. It maps `d` to an Echo and streams
+     that Echo's receiver, one connection per Echo. Everything else returns
+     the same 404. This is the only port the tunnel points to.
    - **LAN listener:** UI, API, status. Never published.
 
    Per receiver: PCM → ffmpeg MP3 → all connected clients, with silence while
@@ -84,8 +90,46 @@ One container with host networking (required for mDNS and NQPTP's UDP
    - iPhone volume → Echo volume with debouncing; Shairport Sync runs with
      `ignore_volume_control = "yes"` so the volume isn't applied twice.
 6. **Skill generator.** Produces the interaction model and `index.js` with the
-   public base URL and secret filled in, plus copy buttons and step-by-step
-   console instructions in the UI.
+   public base URL and signing secret filled in (the code signs each URL with
+   Node's built-in `crypto`), plus copy buttons and step-by-step console
+   instructions in the UI.
+
+## Public endpoint protection
+
+All three checks run on every `/play.mp3` request; any failure gets the same
+plain 404 without a reason. Query strings are never logged in full, `sig`
+never.
+
+1. **Short-lived signed URLs.** The skill signs `d + "|" + exp` with
+   HMAC-SHA256 and a secret the bridge generates (stored in `/data`, never in
+   a URL, never logged, rotatable, which means regenerating the skill code).
+   `exp` is now + 60 s; the bridge allows 30 s clock skew and refuses links
+   valid more than 5 minutes ahead. Launch, resume and the play button each
+   get a fresh URL. A link only has to be valid when the Echo connects; the
+   running stream isn't cut when it expires.
+2. **Home IP only.** The bridge looks up its public IPv4 and IPv6 every few
+   minutes (`https://cloudflare.com/cdn-cgi/trace` per address family,
+   configurable) and accepts a client only if it matches the IPv4 exactly or
+   falls inside the same IPv6 /64 (configurable). On a mismatch it looks
+   again first (rate-limited), so a changed IP costs one lookup. If the
+   address is unknown or hasn't been confirmed for 30 minutes, requests fail
+   closed and the UI and log say so. The client IP comes from
+   `cf-connecting-ip` (configurable) only when the connection comes from a
+   trusted proxy (default loopback, i.e. cloudflared on the host); otherwise
+   the socket address is used. Switchable in the settings (default on) for
+   setups where the Echos leave through another IP. Caveat: behind CGNAT,
+   other customers of the ISP share the IPv4, so the check narrows access
+   less; the other two checks still apply.
+3. **Active session only.** `d` must map to a selected Echo, or be unknown
+   right after the bridge triggered that Echo (learning window). That Echo's
+   receiver must have an active AirPlay session, or the bridge must have
+   triggered it within the last 20 s. One connection per Echo; a new valid
+   connection replaces the old one.
+
+What this doesn't protect against: someone who has the skill code (and so
+the secret) and is on the same home network or behind the same CGNAT IPv4,
+during an active session. The skill code is private to the user's developer
+account.
 
 ## Milestones
 
@@ -94,8 +138,8 @@ One container with host networking (required for mDNS and NQPTP's UDP
    chosen Echo, set volume. Pass if the Echo starts the stream without anyone
    speaking.
 2. **Core service.** Receiver manager plus stream server with both listeners,
-   secret check and device mapping. Reuse the spike streamer as the starting
-   point.
+   device mapping and all three checks from "Public endpoint protection".
+   Reuse the spike streamer as the starting point.
 3. **Session logic.** Start, stop, idle timeout and volume forwarding. Find out
    how Shairport Sync 5.6 names D-Bus services per instance; without that,
    "Echo stopped → pause iPhone" is not possible.
@@ -132,9 +176,10 @@ One container with host networking (required for mDNS and NQPTP's UDP
   2026). It works in the spike, but pin versions.
 - **Latency of 2–4 s.** Fine for music, not for video. Echos and real AirPlay
   speakers in one group won't be in sync.
-- **Public stream endpoint.** Only the secret in the URL protects it. Keep it
-  long, allow rotating it (that means regenerating the skill code), and never
-  expose the LAN listener.
+- **Public stream endpoint.** Protected by signed short-lived URLs, the home
+  IP check and session gating (see above). Keep the secret long, allow
+  rotating it (that means regenerating the skill code), and never expose the
+  LAN listener. The home IP check is weaker behind CGNAT.
 - **Cloudflare's terms** limit using its network mainly for audio or video
   delivery. At a few personal streams this is unlikely to matter, but it's one
   more reason the tunnel is a recommendation, not a requirement.

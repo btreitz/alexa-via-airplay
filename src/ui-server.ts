@@ -209,6 +209,15 @@ export class UiServer {
           invocationName: state.invocationName,
           idleTimeoutSeconds: state.idleTimeoutSeconds,
           forwardVolume: state.forwardVolume,
+          restrictToHomeIp: state.restrictToHomeIp,
+        },
+        publicAccess: {
+          homeIp: bridge.homeIp.status(),
+          restrictToHomeIp: state.restrictToHomeIp,
+          clientIpHeader: bridge.config.clientIpHeader,
+          trustedProxies: bridge.config.trustedProxies,
+          homeIpUnknownSince: this.publicServer.homeIpUnknownSince,
+          rejections: this.publicServer.rejections,
         },
         system: bridge.system?.health() ?? null,
         checks: bridge.checks,
@@ -259,6 +268,10 @@ export class UiServer {
         if (!Number.isInteger(value) || value < 10 || value > 3600) throw new HttpError(400, "Idle timeout must be 10–3600 seconds");
         changes.push((s) => (s.idleTimeoutSeconds = value));
       }
+      if (body.restrictToHomeIp !== undefined) {
+        const value = Boolean(body.restrictToHomeIp);
+        changes.push((s) => (s.restrictToHomeIp = value));
+      }
       if (body.forwardVolume !== undefined) {
         const value = Boolean(body.forwardVolume);
         changes.push((s) => (s.forwardVolume = value));
@@ -308,7 +321,7 @@ export class UiServer {
       const state = store.get();
       const publicBaseUrl = bridge.publicBaseUrl;
       if (!publicBaseUrl) throw new HttpError(409, "Set the public base URL first");
-      const options = { publicBaseUrl, secret: state.streamSecret, invocationName: state.invocationName };
+      const options = { publicBaseUrl, secret: state.signingSecret, invocationName: state.invocationName };
       return {
         streamUrl: streamUrl(publicBaseUrl),
         invocationName: state.invocationName,
@@ -320,9 +333,9 @@ export class UiServer {
 
     r.add("POST", "/api/secret/rotate", () => {
       store.update((s) => {
-        s.streamSecret = newSecret();
+        s.signingSecret = newSecret();
       });
-      log.info("stream secret rotated; the skill code must be updated");
+      log.info("signing secret rotated; the skill code must be updated");
       return { ok: true };
     });
   }

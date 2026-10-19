@@ -13,6 +13,14 @@ function int(name: string, fallback: number): number {
   return value;
 }
 
+function bounded(name: string, fallback: number, min: number, max: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${name} must be an integer ${min}–${max}, got "${raw}"`);
+  return value;
+}
+
 function str(name: string): string | undefined {
   const raw = process.env[name];
   return raw === undefined || raw.trim() === "" ? undefined : raw.trim();
@@ -37,6 +45,15 @@ export interface Config {
   manageReceivers: boolean;
   /** Optional: run cloudflared with this token. */
   tunnelToken?: string;
+  /** Endpoint that answers with the caller's address as an `ip=` line. */
+  publicIpTraceUrl: string;
+  publicIpRefreshSeconds: number;
+  /** IPv6 clients must share this many leading bits with the home address. */
+  ipv6PrefixLength: number;
+  /** Forwarded header with the client address; null to use the socket address. */
+  clientIpHeader: string | null;
+  /** Proxies whose forwarded header is believed (addresses or CIDR ranges). */
+  trustedProxies: string[];
 }
 
 export function loadConfig(): Config {
@@ -54,6 +71,14 @@ export function loadConfig(): Config {
     avahiInterfaces: str("AVAHI_INTERFACES"),
     manageReceivers: str("MANAGE_RECEIVERS") !== "false",
     tunnelToken: str("TUNNEL_TOKEN"),
+    publicIpTraceUrl: str("PUBLIC_IP_TRACE_URL") || "https://cloudflare.com/cdn-cgi/trace",
+    publicIpRefreshSeconds: bounded("PUBLIC_IP_REFRESH_SECONDS", 300, 30, 86400),
+    ipv6PrefixLength: bounded("PUBLIC_IP_V6_PREFIX", 64, 32, 128),
+    clientIpHeader: (() => {
+      const header = str("CLIENT_IP_HEADER") ?? "cf-connecting-ip";
+      return header.toLowerCase() === "none" ? null : header.toLowerCase();
+    })(),
+    trustedProxies: (str("TRUSTED_PROXIES") ?? "127.0.0.1,::1").split(",").map((s) => s.trim()).filter(Boolean),
   };
 }
 

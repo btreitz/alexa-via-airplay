@@ -103,6 +103,8 @@ export class Receiver {
   private readonly shairport?: Supervised;
   private readonly confFile: string;
   private readonly options: ReceiverOptions;
+  /** Set from Shairport Sync's session events once they're wired up; null = unknown. */
+  airplaySession: boolean | null = null;
 
   constructor(options: ReceiverOptions) {
     this.options = options;
@@ -147,6 +149,15 @@ export class Receiver {
       await this.shairport.stop();
       this.shairport.start();
     }
+  }
+
+  /**
+   * Whether an AirPlay sender is (still) using this receiver: the session
+   * flag when known, otherwise audio within the idle window.
+   */
+  sessionActive(idleMs: number): boolean {
+    if (this.airplaySession !== null) return this.airplaySession;
+    return this.input.lastDataAt > 0 && Date.now() - this.input.lastDataAt <= idleMs;
   }
 
   private writeConfig(): void {
