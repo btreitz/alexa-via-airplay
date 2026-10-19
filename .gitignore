@@ -5,6 +5,7 @@ dist/
 # Secrets and runtime state: never commit
 .env
 .env.*
+*.env
 !.env.example
 data/
 *.cookie
