@@ -4,7 +4,6 @@
   "description": "Expose Amazon Echo speakers as AirPlay 2 receivers",
   "private": true,
   "type": "module",
-  "license": "MIT",
   "engines": {
     "node": ">=22.18"
   },
