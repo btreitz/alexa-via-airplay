@@ -6,15 +6,18 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AMAZON_PAGES } from "./alexa.ts";
+import type { DeviceView, SkillResponse, StatusResponse } from "./api-types.ts";
 import type { Bridge } from "./bridge.ts";
 import { errorMessage, logger } from "./log.ts";
 import { interactionModel, launchPhrase, normalizeBaseUrl, skillIndexJs, streamUrl, validateInvocationName } from "./skill.ts";
 import { newSecret, type State } from "./state.ts";
 import type { PublicServer } from "./public-server.ts";
 import { checkPublicUrl } from "./public-url-check.ts";
+import { StaticSite } from "./static-site.ts";
 
 const log = logger("ui");
-const WEB_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../web");
+/** The Next.js static export (pnpm build); override with WEB_DIR. */
+const DEFAULT_WEB_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../web/out");
 const MAX_BODY = 64 * 1024;
 
 export class HttpError extends Error {
@@ -93,20 +96,14 @@ function requireString(body: any, key: string): string {
   return value;
 }
 
-const CONTENT_TYPES: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".ico": "image/x-icon",
-};
-
 export class UiServer {
   private readonly bridge: Bridge;
   private readonly publicServer: PublicServer;
   private readonly router = new Router();
   private server?: http.Server;
+  private readonly site = new StaticSite(process.env.WEB_DIR || DEFAULT_WEB_DIR);
+  /** Extra origin allowed to write, for `next dev` proxying to this API during development. */
+  private readonly devOrigin = process.env.UI_DEV_ORIGIN || null;
   readonly startedAt = Date.now();
 
   constructor(bridge: Bridge, publicServer: PublicServer) {
@@ -149,7 +146,9 @@ export class UiServer {
       // Cross-site requests can't send JSON without a preflight we never answer,
       // and a browser always sends Origin on them.
       const origin = req.headers.origin;
-      if (origin && new URL(origin).host !== req.headers.host) return send(403, { error: "Cross-origin request refused" });
+      if (origin && origin !== this.devOrigin && new URL(origin).host !== req.headers.host) {
+        return send(403, { error: "Cross-origin request refused" });
+      }
       if (!String(req.headers["content-type"] || "").startsWith("application/json")) {
         return send(415, { error: "Use Content-Type: application/json" });
       }
@@ -170,21 +169,20 @@ export class UiServer {
   }
 
   private serveStatic(pathname: string, res: http.ServerResponse): void {
-    const relative = pathname === "/" ? "index.html" : pathname.slice(1);
-    const file = path.resolve(WEB_DIR, relative);
-    if (!file.startsWith(WEB_DIR + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404, { "Content-Type": "text/plain" }).end("Not found\n");
+    const found = this.site.resolve(pathname);
+    if (found) {
+      res.writeHead(200, found.headers);
+      fs.createReadStream(found.file).pipe(res);
       return;
     }
-    res.writeHead(200, {
-      "Content-Type": CONTENT_TYPES[path.extname(file)] || "application/octet-stream",
-      "Cache-Control": "no-cache",
-      "X-Content-Type-Options": "nosniff",
-      "X-Frame-Options": "DENY",
-      "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
-      "Referrer-Policy": "no-referrer",
-    });
-    fs.createReadStream(file).pipe(res);
+    const notFound = this.site.notFoundPage();
+    if (notFound && pathname !== "/") {
+      res.writeHead(404, notFound.headers);
+      fs.createReadStream(notFound.file).pipe(res);
+      return;
+    }
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end(this.site.available ? "Not found\n" : "The web UI isn't built. Run `pnpm --filter @alexa-via-airplay/web build`.\n");
   }
 
   private receiverEntry(serial: string) {
@@ -200,7 +198,7 @@ export class UiServer {
 
     r.add("GET", "/api/health", () => ({ ok: true }));
 
-    r.add("GET", "/api/status", () => {
+    r.add("GET", "/api/status", (): StatusResponse => {
       const state = store.get();
       return {
         uptimeSeconds: Math.round((Date.now() - this.startedAt) / 1000),
@@ -226,7 +224,7 @@ export class UiServer {
         system: bridge.system?.health() ?? null,
         checks: bridge.checks,
         publicUrlCheck: bridge.publicUrlCheck,
-        tunnel: bridge.tunnel?.status() ?? { enabled: false },
+        tunnel: bridge.tunnel?.status() ?? { enabled: false as const },
         receivers: bridge.receiverStatuses(),
         publicRequests: this.publicServer.recent.slice(-20).reverse(),
       };
@@ -247,7 +245,7 @@ export class UiServer {
       return bridge.alexa.state;
     });
 
-    r.add("GET", "/api/devices", () => {
+    r.add("GET", "/api/devices", (): DeviceView[] => {
       const selected = new Set(store.get().receivers.map((x) => x.serial));
       return bridge.alexa.devices().map((d) => ({ ...d, selected: selected.has(d.serial) }));
     });
@@ -329,7 +327,7 @@ export class UiServer {
       return { ok: true };
     });
 
-    r.add("GET", "/api/skill", () => {
+    r.add("GET", "/api/skill", (): SkillResponse => {
       const state = store.get();
       const publicBaseUrl = bridge.publicBaseUrl;
       if (!publicBaseUrl) throw new HttpError(409, "Set the public base URL first");

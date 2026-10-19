@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { after, before, test } from "node:test";
 import { Bridge } from "../src/bridge.ts";
 import { loadConfig } from "../src/config.ts";
@@ -9,6 +11,9 @@ import { tempDir } from "./helpers.ts";
 process.env.DATA_DIR = tempDir();
 process.env.RUN_DIR = tempDir();
 process.env.MANAGE_RECEIVERS = "false";
+const webDir = tempDir();
+fs.writeFileSync(path.join(webDir, "index.html"), "<!doctype html><script>boot()</script>");
+process.env.WEB_DIR = webDir;
 const bridge = new Bridge(loadConfig());
 const publicServer = new PublicServer({
   store: bridge.store,
@@ -71,7 +76,7 @@ test("rotating the secret changes it", async () => {
 test("static files: UI with CSP, no path traversal", async () => {
   const index = await fetch(`${base}/`);
   assert.equal(index.status, 200);
-  assert.match(index.headers.get("content-security-policy") || "", /default-src 'self'/);
+  assert.match(index.headers.get("content-security-policy") || "", /script-src 'self' 'sha256-/);
   assert.equal((await fetch(`${base}/..%2fpackage.json`)).status, 404);
   assert.equal((await fetch(`${base}/%2e%2e/src/state.ts`)).status, 404);
 });

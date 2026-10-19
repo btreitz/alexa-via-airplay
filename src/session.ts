@@ -76,6 +76,8 @@ export interface ReceiverSession {
   dropTimer?: { cancel(): void };
 }
 
+export type SessionSnapshot = Omit<ReceiverSession, "volumeTimer" | "dropTimer">;
+
 export class SessionManager {
   private readonly deps: SessionDeps;
   private readonly sessions = new Map<string, ReceiverSession>();
@@ -100,7 +102,7 @@ export class SessionManager {
     return s;
   }
 
-  snapshot(id: string): Omit<ReceiverSession, "volumeTimer" | "dropTimer"> {
+  snapshot(id: string): SessionSnapshot {
     const { volumeTimer: _v, dropTimer: _d, ...rest } = this.session(id);
     return rest;
   }

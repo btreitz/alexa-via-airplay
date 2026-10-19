@@ -58,20 +58,36 @@ The container needs `network_mode: host`.
 
 ## Development
 
-TypeScript on Node ≥ 22.18, run directly without a build step (Node strips
-the types); `tsc` only type-checks.
+A pnpm workspace: the bridge (TypeScript on Node ≥ 22.18, run directly
+without a build step; `tsc` only type-checks) at the root, and the web UI
+(Next.js with shadcn/ui) in `web/`.
 
 ```bash
-npm install
-npm run check        # type-check and tests
+pnpm install
+pnpm check           # type-check bridge and UI, run the tests
+pnpm build           # build the UI (static export to web/out)
 ```
 
 The receivers and audio need Linux, Shairport Sync and ffmpeg, so they run
 in the container. For the HTTP side (UI, API, public listener) on a laptop:
 
 ```bash
-DATA_DIR=./data RUN_DIR=/tmp/avb MANAGE_RECEIVERS=false npm start
+pnpm build
+DATA_DIR=./data RUN_DIR=/tmp/avb MANAGE_RECEIVERS=false pnpm start
 ```
+
+To work on the UI with hot reload, run `next dev` against a running bridge
+(local as above, or on another host). The dev server proxies `/api` to it;
+`UI_DEV_ORIGIN` lets the bridge accept the dev server's writes:
+
+```bash
+UI_DEV_ORIGIN=http://localhost:3000 DATA_DIR=./data RUN_DIR=/tmp/avb MANAGE_RECEIVERS=false pnpm start
+BRIDGE_URL=http://localhost:8098 pnpm dev:web
+```
+
+In production the UI is a static export served by the bridge itself, on the
+same origin as the API; no Next.js server runs. Its CSP lists the hashes of
+the page's inline scripts instead of allowing inline scripts in general.
 
 `src/` overview:
 
@@ -85,7 +101,7 @@ DATA_DIR=./data RUN_DIR=/tmp/avb MANAGE_RECEIVERS=false npm start
 | `alexa.ts` | Amazon login and commands (alexa-remote2) |
 | `public-server.ts`, `signing.ts`, `public-ip.ts`, `client-ip.ts` | Public listener and its checks |
 | `skill.ts` | Generated skill code and interaction model |
-| `ui-server.ts`, `web/` | LAN API and UI |
+| `ui-server.ts`, `static-site.ts`, `api-types.ts` | LAN API, UI file serving, API types shared with `web/` |
 | `checks.ts`, `public-url-check.ts`, `tunnel.ts` | Startup checks, URL check, built-in cloudflared |
 
 Background: [docs/PLAN.md](docs/PLAN.md) (design and decisions) and

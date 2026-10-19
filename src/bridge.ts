@@ -10,6 +10,7 @@ import { DeviceMapper, LEARN_WINDOW_MS } from "./device-map.ts";
 import { errorMessage, logger } from "./log.ts";
 import { airplayDeviceIdFor, Receiver, receiverId, type ReceiverStatus } from "./receiver.ts";
 import { HomeIpMonitor } from "./public-ip.ts";
+import type { ReceiverView } from "./api-types.ts";
 import type { PublicUrlResult } from "./public-url-check.ts";
 import type { SessionManager } from "./session.ts";
 import { Tunnel } from "./tunnel.ts";
@@ -220,7 +221,7 @@ export class Bridge extends EventEmitter {
     this.receiverBySerial(serial)?.stream.dropAll();
   }
 
-  receiverStatuses() {
+  receiverStatuses(): ReceiverView[] {
     const devices = new Map(this.alexa.devices().map((d) => [d.serial, d]));
     return this.store.get().receivers.map((entry) => {
       const receiver = this.receivers.get(receiverId(entry.serial));

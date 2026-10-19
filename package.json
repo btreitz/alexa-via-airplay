@@ -9,9 +9,11 @@
   },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/main.ts",
-    "typecheck": "tsc && tsc -p tsconfig.web.json",
+    "build": "pnpm --filter @alexa-via-airplay/web build",
+    "dev:web": "pnpm --filter @alexa-via-airplay/web dev",
+    "typecheck": "tsc && pnpm --filter @alexa-via-airplay/web typecheck",
     "test": "LOG_LEVEL=error node --disable-warning=ExperimentalWarning --test 'test/**/*.test.ts'",
-    "check": "npm run typecheck && npm test"
+    "check": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
     "aedes": "^1.2.0",
@@ -20,5 +22,6 @@
   "devDependencies": {
     "@types/node": "^22.18.0",
     "typescript": "^5.9.0"
-  }
+  },
+  "packageManager": "pnpm@11.12.0"
 }

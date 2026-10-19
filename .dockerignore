@@ -1,5 +1,7 @@
 .git
-node_modules
+**/node_modules
+**/.next
+web/out
 data
 docs
 spikes
@@ -7,4 +9,5 @@ test
 *.env
 .env
 .env.*
-*.md
+**/*.md
+**/*.tsbuildinfo
