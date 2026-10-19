@@ -15,6 +15,7 @@ const TICK_MS = 20;
 const SILENCE_AFTER_MS = 200;
 const ENCODER_LINGER_MS = 15_000;
 const MAX_CLIENT_BACKLOG = 1024 * 1024;
+const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
 const SILENCE = Buffer.alloc(Math.round((BYTES_PER_SECOND * TICK_MS) / 1000 / 4) * 4);
 
 /**
@@ -154,9 +155,9 @@ export class Mp3Broadcaster extends EventEmitter {
 
   private startEncoder(): void {
     if (this.encoder) return;
-    const encoder = spawn("ffmpeg", [
+    const encoder = spawn(FFMPEG, [
       "-hide_banner", "-loglevel", "warning", "-nostdin",
-      "-f", "s16le", "-ar", String(SAMPLE_RATE), "-ac", "2", "-i", "pipe:0",
+      "-f", "s16le", "-ar", String(SAMPLE_RATE), "-ch_layout", "stereo", "-i", "pipe:0",
       "-c:a", "libmp3lame", "-b:a", "192k", "-flush_packets", "1", "-f", "mp3", "pipe:1",
     ]);
     this.encoder = encoder;

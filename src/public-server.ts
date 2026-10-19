@@ -185,7 +185,7 @@ export class PublicServer extends EventEmitter {
 
     res.writeHead(200, {
       "Content-Type": "audio/mpeg",
-      "Cache-Control": "no-cache, no-store",
+      "Cache-Control": "no-store, private",
       "X-Content-Type-Options": "nosniff",
     });
     if (req.method === "HEAD") {
