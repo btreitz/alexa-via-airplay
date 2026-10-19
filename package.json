@@ -1,0 +1,24 @@
+{
+  "name": "alexa-via-airplay",
+  "version": "0.1.0",
+  "description": "Expose Amazon Echo speakers as AirPlay 2 receivers",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/main.ts",
+    "typecheck": "tsc",
+    "test": "node --disable-warning=ExperimentalWarning --test 'test/**/*.test.ts'",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "alexa-remote2": "8.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.0"
+  }
+}

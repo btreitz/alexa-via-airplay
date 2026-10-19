@@ -1,0 +1,19 @@
+name: alexa-via-airplay
+
+services:
+  bridge:
+    build: .
+    image: alexa-via-airplay:dev
+    restart: unless-stopped
+    # Required: AirPlay discovery (mDNS) and NQPTP's UDP 319/320 need the host network.
+    network_mode: host
+    cap_add:
+      - SYS_NICE # lets Shairport Sync raise its audio thread priority
+    volumes:
+      - data:/data
+    env_file:
+      - path: .env
+        required: false
+
+volumes:
+  data:
