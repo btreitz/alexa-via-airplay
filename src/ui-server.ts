@@ -181,6 +181,7 @@ export class UiServer {
       "Cache-Control": "no-cache",
       "X-Content-Type-Options": "nosniff",
       "X-Frame-Options": "DENY",
+      "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       "Referrer-Policy": "no-referrer",
     });
     fs.createReadStream(file).pipe(res);

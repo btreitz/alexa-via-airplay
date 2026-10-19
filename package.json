@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/main.ts",
-    "typecheck": "tsc",
+    "typecheck": "tsc && tsc -p tsconfig.web.json",
     "test": "LOG_LEVEL=error node --disable-warning=ExperimentalWarning --test 'test/**/*.test.ts'",
     "check": "npm run typecheck && npm test"
   },
