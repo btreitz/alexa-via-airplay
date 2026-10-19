@@ -10,6 +10,7 @@
 //
 // Every failure gets the same plain 404. Query strings are never logged.
 
+import crypto from "node:crypto";
 import { EventEmitter } from "node:events";
 import http from "node:http";
 import type { Writable } from "node:stream";
@@ -137,8 +138,39 @@ export class PublicServer extends EventEmitter {
     this.notFound(res);
   }
 
+  private probe?: { nonce: string; seen: (remote: string | null) => void };
+
+  /**
+   * Waits for our own reachability probe (`/play.mp3?probe=<nonce>`) to arrive
+   * through the public URL. It gets the same 404 as everything else; we only
+   * note that it arrived and from which client address.
+   */
+  expectProbe(nonce: string, timeoutMs: number): Promise<{ remote: string | null } | null> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.probe = undefined;
+        resolve(null);
+      }, timeoutMs);
+      this.probe = {
+        nonce,
+        seen: (remote) => {
+          clearTimeout(timer);
+          this.probe = undefined;
+          resolve({ remote });
+        },
+      };
+    });
+  }
+
   private async handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const url = new URL(req.url || "/", "http://localhost");
+    const probe = url.searchParams.get("probe");
+    if (probe && this.probe && probe.length === this.probe.nonce.length && url.pathname === "/play.mp3") {
+      if (crypto.timingSafeEqual(Buffer.from(probe), Buffer.from(this.probe.nonce))) {
+        this.probe.seen(this.deps.clientIp.resolve(req.socket.remoteAddress, req.headers));
+        return this.notFound(res);
+      }
+    }
     if (url.pathname !== "/play.mp3" || (req.method !== "GET" && req.method !== "HEAD")) {
       // Scanners hit everything; count them, don't fill the log.
       this.rejections.path = (this.rejections.path || 0) + 1;

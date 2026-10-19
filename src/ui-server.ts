@@ -11,6 +11,7 @@ import { errorMessage, logger } from "./log.ts";
 import { interactionModel, launchPhrase, normalizeBaseUrl, skillIndexJs, streamUrl, validateInvocationName } from "./skill.ts";
 import { newSecret, type State } from "./state.ts";
 import type { PublicServer } from "./public-server.ts";
+import { checkPublicUrl } from "./public-url-check.ts";
 
 const log = logger("ui");
 const WEB_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../web");
@@ -196,6 +197,8 @@ export class UiServer {
     const bridge = this.bridge;
     const store = bridge.store;
 
+    r.add("GET", "/api/health", () => ({ ok: true }));
+
     r.add("GET", "/api/status", () => {
       const state = store.get();
       return {
@@ -221,6 +224,8 @@ export class UiServer {
         },
         system: bridge.system?.health() ?? null,
         checks: bridge.checks,
+        publicUrlCheck: bridge.publicUrlCheck,
+        tunnel: bridge.tunnel?.status() ?? { enabled: false },
         receivers: bridge.receiverStatuses(),
         publicRequests: this.publicServer.recent.slice(-20).reverse(),
       };
@@ -257,7 +262,13 @@ export class UiServer {
       if (body.publicBaseUrl !== undefined) {
         if (bridge.config.publicBaseUrl) throw new HttpError(409, "PUBLIC_BASE_URL is set in the environment");
         const value = body.publicBaseUrl ? normalizeBaseUrl(String(body.publicBaseUrl)) : undefined;
-        changes.push((s) => (s.publicBaseUrl = value));
+        changes.push((s) => {
+          if (s.publicBaseUrl !== value) {
+            s.publicUrlVerifiedAt = undefined;
+            bridge.publicUrlCheck = null;
+          }
+          s.publicBaseUrl = value;
+        });
       }
       if (body.invocationName !== undefined) {
         const value = validateInvocationName(String(body.invocationName));
@@ -329,6 +340,17 @@ export class UiServer {
         indexJs: skillIndexJs(options),
         interactionModel: interactionModel(state.invocationName),
       };
+    });
+
+    r.add("POST", "/api/public-url/check", async () => {
+      const base = bridge.publicBaseUrl;
+      if (!base) throw new HttpError(409, "Set the public base URL first");
+      const result = await checkPublicUrl(base, this.publicServer, bridge.homeIp);
+      bridge.publicUrlCheck = result;
+      store.update((s) => {
+        s.publicUrlVerifiedAt = result.ok ? result.checkedAt : s.publicUrlVerifiedAt;
+      });
+      return result;
     });
 
     r.add("POST", "/api/secret/rotate", () => {

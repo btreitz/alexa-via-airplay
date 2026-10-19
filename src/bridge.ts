@@ -3,13 +3,16 @@
 
 import { EventEmitter } from "node:events";
 import { AlexaController } from "./alexa.ts";
+import { hostNetworkCheck, mdnsCheck, ptpPortsCheck, type Check } from "./checks.ts";
 import { ClientIpResolver } from "./client-ip.ts";
 import { dataPath, type Config } from "./config.ts";
 import { DeviceMapper, LEARN_WINDOW_MS } from "./device-map.ts";
 import { errorMessage, logger } from "./log.ts";
 import { airplayDeviceIdFor, Receiver, receiverId, type ReceiverStatus } from "./receiver.ts";
 import { HomeIpMonitor } from "./public-ip.ts";
+import type { PublicUrlResult } from "./public-url-check.ts";
 import type { SessionManager } from "./session.ts";
+import { Tunnel } from "./tunnel.ts";
 import { launchPhrase } from "./skill.ts";
 import { StateStore, type ReceiverEntry } from "./state.ts";
 import { SystemServices, waitFor } from "./system-services.ts";
@@ -35,12 +38,6 @@ export function validateReceiverName(input: string): string {
   return name;
 }
 
-export interface Check {
-  name: string;
-  ok: boolean;
-  message: string;
-}
-
 export interface MqttSettings {
   port: number;
   topicFor: (receiverId: string) => string;
@@ -61,6 +58,8 @@ export class Bridge extends EventEmitter {
   sessions?: SessionManager;
   /** Results of the startup checks, shown in the UI. */
   checks: Check[] = [];
+  publicUrlCheck: PublicUrlResult | null = null;
+  readonly tunnel?: Tunnel;
 
   constructor(config: Config) {
     super();
@@ -75,6 +74,14 @@ export class Bridge extends EventEmitter {
       ipv6PrefixLength: config.ipv6PrefixLength,
     });
     this.clientIp = new ClientIpResolver({ header: config.clientIpHeader, trustedProxies: config.trustedProxies });
+    if (config.tunnelToken) this.tunnel = new Tunnel(config.tunnelToken);
+  }
+
+  /** Host checks that must run before NQPTP and Avahi take the ports. */
+  private async runHostChecks(): Promise<void> {
+    if (!this.config.manageReceivers) return;
+    this.checks = [hostNetworkCheck(), await ptpPortsCheck(), await mdnsCheck()];
+    for (const check of this.checks) (check.ok ? log.info : log.warn)(`check ${check.name}: ${check.message}`);
   }
 
   recentlyTriggered(serial: string): boolean {
@@ -89,6 +96,7 @@ export class Bridge extends EventEmitter {
   async start(): Promise<void> {
     // Not awaited: an unreachable trace endpoint must not block startup (requests fail closed meanwhile).
     void this.homeIp.start();
+    await this.runHostChecks();
     await this.system?.start();
     await this.reconcile();
     await this.alexa.resume(this.store.get().amazonPage);
@@ -96,6 +104,7 @@ export class Bridge extends EventEmitter {
 
   async stop(): Promise<void> {
     this.homeIp.stop();
+    await this.tunnel?.stop();
     this.alexa.shutdown();
     await Promise.all([...this.receivers.values()].map((r) => r.stop()));
     this.receivers.clear();

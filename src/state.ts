@@ -33,6 +33,8 @@ export interface State {
   forwardVolume: boolean;
   /** Serve the public stream only to clients behind this home's public IP. */
   restrictToHomeIp: boolean;
+  /** Set once the public URL check succeeded; enables automatic re-checks. */
+  publicUrlVerifiedAt?: string;
 }
 
 export const DEFAULT_INVOCATION_NAME = "my sound bridge";
