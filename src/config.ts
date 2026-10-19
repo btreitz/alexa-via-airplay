@@ -37,6 +37,8 @@ export interface Config {
   uiBind: string;
   alexaProxyPort: number;
   airplayBasePort: number;
+  /** Loopback-only MQTT broker for the receivers' session events. */
+  eventBusPort: number;
   /** Overrides the public base URL stored in /data when set. */
   publicBaseUrl?: string;
   /** Network interfaces Avahi announces on, comma-separated. Default: the default route's interface. */
@@ -67,6 +69,7 @@ export function loadConfig(): Config {
     uiBind: str("UI_BIND") || "0.0.0.0",
     alexaProxyPort: int("ALEXA_PROXY_PORT", 3456),
     airplayBasePort: int("AIRPLAY_BASE_PORT", 7000),
+    eventBusPort: int("EVENT_BUS_PORT", 18830),
     publicBaseUrl: str("PUBLIC_BASE_URL"),
     avahiInterfaces: str("AVAHI_INTERFACES"),
     manageReceivers: str("MANAGE_RECEIVERS") !== "false",

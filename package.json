@@ -11,10 +11,11 @@
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/main.ts",
     "typecheck": "tsc",
-    "test": "node --disable-warning=ExperimentalWarning --test 'test/**/*.test.ts'",
+    "test": "LOG_LEVEL=error node --disable-warning=ExperimentalWarning --test 'test/**/*.test.ts'",
     "check": "npm run typecheck && npm test"
   },
   "dependencies": {
+    "aedes": "^1.2.0",
     "alexa-remote2": "8.1.1"
   },
   "devDependencies": {

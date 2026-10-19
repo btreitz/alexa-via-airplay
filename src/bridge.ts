@@ -9,6 +9,7 @@ import { DeviceMapper, LEARN_WINDOW_MS } from "./device-map.ts";
 import { errorMessage, logger } from "./log.ts";
 import { airplayDeviceIdFor, Receiver, receiverId, type ReceiverStatus } from "./receiver.ts";
 import { HomeIpMonitor } from "./public-ip.ts";
+import type { SessionManager } from "./session.ts";
 import { launchPhrase } from "./skill.ts";
 import { StateStore, type ReceiverEntry } from "./state.ts";
 import { SystemServices, waitFor } from "./system-services.ts";
@@ -57,6 +58,7 @@ export class Bridge extends EventEmitter {
   private readonly receivers = new Map<string, Receiver>();
   private reconciling: Promise<void> = Promise.resolve();
   mqtt?: MqttSettings;
+  sessions?: SessionManager;
   /** Results of the startup checks, shown in the UI. */
   checks: Check[] = [];
 
@@ -206,7 +208,7 @@ export class Bridge extends EventEmitter {
     await this.alexa.stopPlayback(serial);
   }
 
-  receiverStatuses(): (ReceiverStatus & { mapped: boolean; echoName?: string; echoOnline?: boolean })[] {
+  receiverStatuses() {
     const devices = new Map(this.alexa.devices().map((d) => [d.serial, d]));
     return this.store.get().receivers.map((entry) => {
       const receiver = this.receivers.get(receiverId(entry.serial));
@@ -214,7 +216,13 @@ export class Bridge extends EventEmitter {
       const base: ReceiverStatus = receiver
         ? receiver.status()
         : { id: receiverId(entry.serial), serial: entry.serial, name: entry.name, port: entry.port, process: null, audio: { active: false, secondsTotal: 0, lastAudioSecondsAgo: null, levelDb: null }, listeners: [] };
-      return { ...base, mapped: this.mapper.isMapped(entry.serial), echoName: device?.name, echoOnline: device?.online };
+      return {
+        ...base,
+        mapped: this.mapper.isMapped(entry.serial),
+        echoName: device?.name,
+        echoOnline: device?.online,
+        session: this.sessions?.snapshot(base.id) ?? null,
+      };
     });
   }
 }

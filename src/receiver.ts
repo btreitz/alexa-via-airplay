@@ -151,6 +151,18 @@ export class Receiver {
     }
   }
 
+  get lastAudioAt(): number {
+    return this.input.lastDataAt;
+  }
+
+  get serial(): string {
+    return this.entry.serial;
+  }
+
+  setAirplaySession(active: boolean | null): void {
+    this.airplaySession = active;
+  }
+
   /**
    * Whether an AirPlay sender is (still) using this receiver: the session
    * flag when known, otherwise audio within the idle window.
