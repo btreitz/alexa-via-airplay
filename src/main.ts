@@ -1,14 +1,14 @@
 // Entry point: one process supervises the shared services, the receivers and
 // both HTTP listeners.
 
-import { Bridge } from "./bridge.ts";
+import { Bridge } from "./bridge/bridge.ts";
 import { loadConfig } from "./config.ts";
-import { EventBus, topicFor } from "./event-bus.ts";
-import { errorMessage, logger } from "./log.ts";
-import { PublicServer } from "./public-server.ts";
-import { checkPublicUrl } from "./public-url-check.ts";
-import { SessionManager } from "./session.ts";
-import { UiServer } from "./ui-server.ts";
+import { EventBus, topicFor } from "./airplay/event-bus.ts";
+import { errorMessage, logger } from "./lib/log.ts";
+import { PublicServer } from "./public/server.ts";
+import { checkPublicUrl } from "./public/url-check.ts";
+import { SessionManager } from "./bridge/session.ts";
+import { UiServer } from "./ui/server.ts";
 
 const log = logger("main");
 
