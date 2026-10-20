@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { VolumeControl } from "@/components/bridge/volume-control";
 import { NeedsStep, ToneIcon, type Tone } from "@/components/shell/status";
 import { ViewHeader } from "@/components/shell/view";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Slider } from "@/components/ui/slider";
 import { useBridge } from "@/hooks/use-bridge";
-import { navigate } from "@/hooks/use-view";
+import Link from "next/link";
+import { useSetup } from "@/hooks/use-setup";
 import { api, type ReceiverView } from "@/lib/api";
-import type { Step } from "@/lib/setup";
+import { HREF } from "@/lib/setup";
 
 function state(r: ReceiverView): [Tone | null, string] {
   if (r.process && !r.process.running) return ["bad", "Receiver not running"];
@@ -58,20 +59,13 @@ function SpeakerCard({ receiver, signedIn }: { receiver: ReceiverView; signedIn:
           </div>
           {receiver.audio.active && <Level db={receiver.audio.levelDb} />}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-muted-foreground w-14 text-xs">Volume</span>
-          <Slider
-            aria-label={`Volume of ${receiver.name}`}
-            min={0}
-            max={100}
-            step={5}
-            disabled={!signedIn}
-            value={[shown]}
-            onValueChange={([v]) => setVolume(v)}
-            onValueCommit={([v]) => void run(() => api.setVolume(receiver.serial, v)).then(() => setVolume(null))}
-          />
-          <span className="w-8 text-right text-xs tabular-nums">{shown}</span>
-        </div>
+        <VolumeControl
+          label={`Volume of ${receiver.name}`}
+          value={shown}
+          disabled={!signedIn}
+          onChange={setVolume}
+          onCommit={(v) => void run(() => api.setVolume(receiver.serial, v)).then(() => setVolume(null))}
+        />
       </CardContent>
       {(receiver.session?.lastError || !receiver.mapped) && (
         <CardFooter className="text-xs">
@@ -86,9 +80,10 @@ function SpeakerCard({ receiver, signedIn }: { receiver: ReceiverView; signedIn:
   );
 }
 
-export function SpeakersPage({ steps }: { steps: Step[] }) {
-  const { status } = useBridge();
-  if (!status) return null;
+export function SpeakersPage() {
+  const setup = useSetup();
+  if (!setup) return null;
+  const { status, steps } = setup;
   const pending = steps.find((s) => !s.done);
 
   let body;
@@ -114,8 +109,8 @@ export function SpeakersPage({ steps }: { steps: Step[] }) {
           <EmptyDescription>Choose which Echos appear as AirPlay speakers.</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button variant="outline" onClick={() => navigate("echos")}>
-            Choose Echos
+          <Button variant="outline" asChild>
+            <Link href={HREF.echos}>Choose Echos</Link>
           </Button>
         </EmptyContent>
       </Empty>
@@ -130,8 +125,8 @@ export function SpeakersPage({ steps }: { steps: Step[] }) {
         description="Pick these on your iPhone or Mac like any AirPlay speaker. The Echo starts and stops with AirPlay."
         actions={
           status.receivers.length > 0 && (
-            <Button variant="outline" onClick={() => navigate("echos")}>
-              Add or remove Echos
+            <Button variant="outline" asChild>
+              <Link href={HREF.echos}>Add or remove Echos</Link>
             </Button>
           )
         }

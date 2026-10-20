@@ -3,11 +3,38 @@
 
 import type { DeviceView, StatusResponse } from "@/lib/api";
 
-export const STEP_IDS = ["url", "amazon", "skill", "echos"] as const;
-export type StepId = (typeof STEP_IDS)[number];
-export const PAGE_IDS = ["speakers", "settings", "diagnostics"] as const;
-export type PageId = (typeof PAGE_IDS)[number];
-export type ViewId = StepId | PageId;
+export type StepId = "url" | "amazon" | "skill" | "echos";
+
+/** Each view is a route (a folder under src/app). */
+export const HREF = {
+  url: "/setup/public-url",
+  amazon: "/setup/amazon",
+  skill: "/setup/skill/create",
+  echos: "/setup/echos",
+  speakers: "/speakers",
+  settings: "/settings",
+  diagnostics: "/diagnostics",
+} as const;
+
+export type ViewId = keyof typeof HREF;
+
+/** The skill step's parts, each a route under /setup/skill/. */
+export const SKILL_PARTS = [
+  { slug: "create", label: "Create" },
+  { slug: "interaction-model", label: "Interaction model" },
+  { slug: "audio-player", label: "Audio Player" },
+  { slug: "code", label: "Code" },
+  { slug: "testing", label: "Testing" },
+] as const;
+
+export type SkillPart = (typeof SKILL_PARTS)[number]["slug"];
+
+/** The view a path belongs to, for highlighting it in the sidebar. */
+export function viewOf(pathname: string): ViewId | null {
+  if (pathname.startsWith("/setup/skill")) return "skill";
+  const entry = Object.entries(HREF).find(([, href]) => pathname === href || pathname === `${href}/`);
+  return entry ? (entry[0] as ViewId) : null;
+}
 
 export interface Step {
   id: StepId;
@@ -56,7 +83,7 @@ export function setupSteps(status: StatusResponse, devices: DeviceView[], skillC
   ];
 }
 
-/** The step to show when the user hasn't picked a view: the first unfinished one. */
+/** Where "/" leads: the first unfinished step, or the speakers once all are done. */
 export function defaultView(steps: Step[]): ViewId {
   return steps.find((s) => !s.done)?.id ?? "speakers";
 }

@@ -4,11 +4,11 @@
 // time; once they are done they fold away and the daily pages lead.
 
 import { ActivityIcon, CheckIcon, ChevronRightIcon, SettingsIcon, SpeakerIcon, type LucideIcon } from "lucide-react";
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { navigate } from "@/hooks/use-view";
 import { cn } from "@/lib/utils";
-import type { PageId, Step, ViewId } from "@/lib/setup";
+import { HREF, type Step, type ViewId } from "@/lib/setup";
 
 function StepMarker({ step, current }: { step: Step; current: boolean }) {
   return (
@@ -23,7 +23,7 @@ function StepMarker({ step, current }: { step: Step; current: boolean }) {
   );
 }
 
-function StepList({ steps, view }: { steps: Step[]; view: ViewId }) {
+function StepList({ steps, view }: { steps: Step[]; view: ViewId | null }) {
   return (
     <ol className="relative">
       {/* The line that connects the markers shows the direction of the setup. */}
@@ -32,9 +32,8 @@ function StepList({ steps, view }: { steps: Step[]; view: ViewId }) {
         const current = step.id === view;
         return (
           <li key={step.id}>
-            <button
-              type="button"
-              onClick={() => navigate(step.id)}
+            <Link
+              href={HREF[step.id]}
               aria-current={current ? "step" : undefined}
               className={cn(
                 "hover:bg-sidebar-accent flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors",
@@ -46,7 +45,7 @@ function StepList({ steps, view }: { steps: Step[]; view: ViewId }) {
                 <span className={cn("block text-sm leading-5", current ? "font-medium" : step.done ? "text-muted-foreground" : "")}>{step.title}</span>
                 <span className="text-muted-foreground block truncate text-xs">{step.summary}</span>
               </span>
-            </button>
+            </Link>
           </li>
         );
       })}
@@ -58,11 +57,22 @@ function GroupLabel({ children }: { children: ReactNode }) {
   return <div className="text-muted-foreground flex items-center justify-between px-2.5 pb-1.5 text-xs font-medium">{children}</div>;
 }
 
-function PageLink({ id, icon: Icon, label, view, badge }: { id: PageId; icon: LucideIcon; label: string; view: ViewId; badge?: ReactNode }) {
+function PageLink({
+  id,
+  icon: Icon,
+  label,
+  view,
+  badge,
+}: {
+  id: "speakers" | "settings" | "diagnostics";
+  icon: LucideIcon;
+  label: string;
+  view: ViewId | null;
+  badge?: ReactNode;
+}) {
   return (
-    <button
-      type="button"
-      onClick={() => navigate(id)}
+    <Link
+      href={HREF[id]}
       aria-current={view === id ? "page" : undefined}
       className={cn(
         "hover:bg-sidebar-accent flex h-9 w-full items-center gap-3 rounded-lg px-2.5 text-left text-sm transition-colors",
@@ -72,7 +82,7 @@ function PageLink({ id, icon: Icon, label, view, badge }: { id: PageId; icon: Lu
       <Icon className="text-muted-foreground size-4" />
       <span className="flex-1">{label}</span>
       {badge}
-    </button>
+    </Link>
   );
 }
 
@@ -84,7 +94,7 @@ export function AppSidebar({
   footer,
 }: {
   steps: Step[];
-  view: ViewId;
+  view: ViewId | null;
   playing: number;
   problems: number;
   footer: ReactNode;

@@ -1,10 +1,10 @@
 import { CircleAlertIcon, CircleCheckIcon, CircleXIcon } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { navigate } from "@/hooks/use-view";
 import { cn } from "@/lib/utils";
-import type { StepId } from "@/lib/setup";
+import { HREF, type StepId } from "@/lib/setup";
 
 export type Tone = "ok" | "warn" | "bad";
 
@@ -38,8 +38,10 @@ export function NeedsStep({ step, title, children }: { step: { id: StepId; numbe
         <EmptyDescription>{children}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button variant="outline" onClick={() => navigate(step.id)}>
-          Go to step {step.number}: {step.title}
+        <Button variant="outline" asChild>
+          <Link href={HREF[step.id]}>
+            Go to step {step.number}: {step.title}
+          </Link>
         </Button>
       </EmptyContent>
     </Empty>

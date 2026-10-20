@@ -11,16 +11,18 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useBridge } from "@/hooks/use-bridge";
 import { useSyncedState } from "@/hooks/use-synced-state";
-import { navigate } from "@/hooks/use-view";
+import { useSetup } from "@/hooks/use-setup";
 import { api } from "@/lib/api";
 import { ago } from "@/lib/format";
-import type { Step } from "@/lib/setup";
+import { HREF } from "@/lib/setup";
 
-export function PublicUrlStep({ step }: { step: Step }) {
+export function PublicUrlStep() {
   const { status, run } = useBridge();
+  const setup = useSetup();
   const [url, setUrl, form] = useSyncedState(status?.settings.publicBaseUrl ?? "");
   const [checking, setChecking] = useState(false);
-  if (!status) return null;
+  if (!status || !setup) return null;
+  const step = setup.steps[0];
   const { settings, publicUrlCheck: check, tunnel } = status;
 
   // One action: save if changed, then check, because only a checked URL counts.
@@ -108,7 +110,7 @@ export function PublicUrlStep({ step }: { step: Step }) {
         </Collapsible>
       </div>
 
-      <StepFooter next={{ label: step.done ? "Continue" : "Skip for now", secondary: !step.done, onClick: () => navigate("amazon") }} />
+      <StepFooter next={{ label: step.done ? "Continue" : "Skip for now", secondary: !step.done, href: HREF.amazon }} />
     </>
   );
 }

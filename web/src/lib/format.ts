@@ -6,15 +6,28 @@ export function ago(time: string | number | null | undefined): string {
   return `${Math.round(seconds / 3600)} h ago`;
 }
 
-/** The Clipboard API needs HTTPS or localhost; the UI usually runs on plain-HTTP LAN addresses. */
-export async function copyToClipboard(text: string, fallbackSource?: HTMLTextAreaElement | null): Promise<boolean> {
+/**
+ * The Clipboard API needs HTTPS or localhost; the UI usually runs on a plain-HTTP
+ * LAN address. There the old execCommand route works, through a temporary,
+ * off-screen textarea, so nothing has to be visible to copy it.
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;
   } catch {
-    if (!fallbackSource) return false;
-    fallbackSource.focus();
-    fallbackSource.select();
-    return document.execCommand("copy");
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.top = "-1000px";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    try {
+      return document.execCommand("copy");
+    } finally {
+      area.remove();
+    }
   }
 }

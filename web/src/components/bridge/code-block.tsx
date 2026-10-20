@@ -1,24 +1,24 @@
 "use client";
 
 import { CheckIcon, CopyIcon, EyeIcon, EyeOffIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { highlight } from "sugar-high";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { copyToClipboard } from "@/lib/format";
 
 /**
- * Text to paste somewhere else. A secret one stays hidden until asked, so it
- * doesn't end up in screenshots; copying works without showing it.
+ * Code to paste somewhere else, highlighted. A secret one stays hidden until
+ * asked, so it doesn't end up in screenshots; copying works without showing it.
  */
-export function CopyBlock({ label, value, secret = false }: { label: string; value: string; secret?: boolean }) {
-  const area = useRef<HTMLTextAreaElement>(null);
+export function CodeBlock({ label, code, lang, secret = false }: { label: string; code: string; lang: "javascript" | "json"; secret?: boolean }) {
   const [shown, setShown] = useState(!secret);
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  // sugar-high escapes the code; the markup only adds token spans.
+  const html = useMemo(() => (shown ? highlight(code, { lang }) : ""), [code, lang, shown]);
 
   async function copy() {
-    const ok = await copyToClipboard(value, area.current);
-    // Without HTTPS the browser may refuse; then the text must be visible to copy by hand.
-    if (!ok) setShown(true);
+    const ok = await copyToClipboard(code);
+    if (!ok) setShown(true); // last resort: select it by hand
     setState(ok ? "copied" : "failed");
     setTimeout(() => setState("idle"), 2500);
   }
@@ -36,19 +36,14 @@ export function CopyBlock({ label, value, secret = false }: { label: string; val
           )}
           <Button size="sm" variant="outline" onClick={copy}>
             {state === "copied" ? <CheckIcon /> : <CopyIcon />}
-            {state === "copied" ? "Copied" : state === "failed" ? "Copy failed: select and copy by hand" : "Copy"}
+            {state === "copied" ? "Copied" : state === "failed" ? "Copy failed: select it by hand" : "Copy"}
           </Button>
         </div>
       </div>
       {shown ? (
-        <Textarea
-          ref={area}
-          aria-label={label}
-          readOnly
-          spellCheck={false}
-          value={value}
-          className="h-48 resize-y rounded-none border-0 font-mono text-xs focus-visible:ring-0"
-        />
+        <pre className="max-h-80 overflow-auto p-4 font-mono text-xs leading-5">
+          <code dangerouslySetInnerHTML={{ __html: html }} />
+        </pre>
       ) : (
         <p className="text-muted-foreground px-3 py-6 text-center text-xs">Hidden because it contains the signing secret. Copy works without showing it.</p>
       )}

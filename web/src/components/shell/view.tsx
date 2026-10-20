@@ -2,6 +2,7 @@
 // footer with the way back on the left and the way forward on the right.
 
 import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -36,10 +37,26 @@ export function Section({ title, description, children, className }: { title?: s
 
 export interface FooterAction {
   label: string;
-  onClick: () => void;
+  /** Where the button leads; or onClick, for an action that navigates itself. */
+  href?: string;
+  onClick?: () => void;
   /** Not done yet: offered as a quieter way to move on. */
   secondary?: boolean;
-  disabled?: boolean;
+}
+
+function FooterButton({ action, variant, children }: { action: FooterAction; variant: "ghost" | "outline" | "default"; children: ReactNode }) {
+  if (action.href) {
+    return (
+      <Button variant={variant} asChild>
+        <Link href={action.href}>{children}</Link>
+      </Button>
+    );
+  }
+  return (
+    <Button variant={variant} onClick={action.onClick}>
+      {children}
+    </Button>
+  );
 }
 
 export function StepFooter({ back, next }: { back?: FooterAction; next?: FooterAction }) {
@@ -47,16 +64,16 @@ export function StepFooter({ back, next }: { back?: FooterAction; next?: FooterA
     <footer className="mt-10 flex items-center justify-between border-t pt-6">
       <div>
         {back && (
-          <Button variant="ghost" onClick={back.onClick} disabled={back.disabled}>
+          <FooterButton action={back} variant="ghost">
             <ArrowLeftIcon /> {back.label}
-          </Button>
+          </FooterButton>
         )}
       </div>
       <div>
         {next && (
-          <Button variant={next.secondary ? "outline" : "default"} onClick={next.onClick} disabled={next.disabled}>
+          <FooterButton action={next} variant={next.secondary ? "outline" : "default"}>
             {next.label} <ArrowRightIcon />
-          </Button>
+          </FooterButton>
         )}
       </div>
     </footer>

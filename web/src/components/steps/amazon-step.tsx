@@ -9,14 +9,16 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { useBridge } from "@/hooks/use-bridge";
-import { navigate } from "@/hooks/use-view";
+import { useSetup } from "@/hooks/use-setup";
 import { api } from "@/lib/api";
-import type { Step } from "@/lib/setup";
+import { HREF } from "@/lib/setup";
 
-export function AmazonStep({ step }: { step: Step }) {
+export function AmazonStep() {
   const { status, devices, run } = useBridge();
+  const setup = useSetup();
   const [page, setPage] = useState("");
-  if (!status) return null;
+  if (!status || !setup) return null;
+  const step = setup.steps[1];
   const alexa = status.alexa;
   const chosen = page || status.amazonPage || "";
 
@@ -92,8 +94,8 @@ export function AmazonStep({ step }: { step: Step }) {
       />
       {body}
       <StepFooter
-        back={{ label: "Public URL", onClick: () => navigate("url") }}
-        next={{ label: step.done ? "Continue" : "Skip for now", secondary: !step.done, onClick: () => navigate("skill") }}
+        back={{ label: "Public URL", href: HREF.url }}
+        next={{ label: step.done ? "Continue" : "Skip for now", secondary: !step.done, href: HREF.skill }}
       />
     </>
   );

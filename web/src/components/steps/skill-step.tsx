@@ -1,8 +1,10 @@
 "use client";
 
 import { ChevronRightIcon, ExternalLinkIcon } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { CopyBlock } from "@/components/bridge/copy-block";
+import { CodeBlock } from "@/components/bridge/code-block";
 import { NeedsStep } from "@/components/shell/status";
 import { StepFooter, ViewHeader } from "@/components/shell/view";
 import { Button } from "@/components/ui/button";
@@ -13,14 +15,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { useBridge } from "@/hooks/use-bridge";
 import { setSkillConfirmed } from "@/hooks/use-skill-confirmed";
 import { useSyncedState } from "@/hooks/use-synced-state";
-import { navigate } from "@/hooks/use-view";
+import { useSetup } from "@/hooks/use-setup";
 import { api, type SkillResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { Step } from "@/lib/setup";
+import { HREF, SKILL_PARTS, type SkillPart } from "@/lib/setup";
 
 const CONSOLE = "https://developer.amazon.com/alexa/console/ask";
-
-const PARTS = ["Create", "Interaction model", "Audio Player", "Code", "Testing"] as const;
 
 /** The path to click through in the developer console. */
 function ConsolePath({ path }: { path: string[] }) {
@@ -60,14 +60,13 @@ function Choices({ rows }: { rows: [string, string][] }) {
 }
 
 /** The sub-steps as a horizontal sequence; the bar fills up to the current one. */
-function PartTabs({ part, onSelect }: { part: number; onSelect: (i: number) => void }) {
+function PartTabs({ part }: { part: number }) {
   return (
     <ol className="mb-6 grid grid-cols-5 gap-1.5" aria-label="Skill setup">
-      {PARTS.map((label, i) => (
-        <li key={label}>
-          <button
-            type="button"
-            onClick={() => onSelect(i)}
+      {SKILL_PARTS.map(({ slug, label }, i) => (
+        <li key={slug}>
+          <Link
+            href={`/setup/skill/${slug}`}
             aria-current={i === part ? "step" : undefined}
             className="group w-full space-y-2 text-left"
           >
@@ -76,10 +75,36 @@ function PartTabs({ part, onSelect }: { part: number; onSelect: (i: number) => v
               <span className="tabular-nums">{i + 1}.</span>
               {label}
             </span>
-          </button>
+          </Link>
         </li>
       ))}
     </ol>
+  );
+}
+
+/** Where the secret in the skill code comes from, and what to do if it leaked. */
+function SecretNote() {
+  return (
+    <Collapsible className="rounded-lg border">
+      <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium">
+        <ChevronRightIcon className="text-muted-foreground size-4 transition-transform group-data-[state=open]:rotate-90" />
+        About the signing secret in this code
+      </CollapsibleTrigger>
+      <CollapsibleContent className="text-muted-foreground space-y-2 px-4 pb-4 pl-10 text-sm">
+        <p>
+          The skill signs every stream link it hands to an Echo, and the bridge only serves links with a valid signature. So nobody can play your
+          stream by guessing its address.
+        </p>
+        <p>
+          The secret is 32 random bytes that the bridge generated on its first start. It lives only in the bridge&apos;s data volume and in this code.
+          You can&apos;t pick it yourself: if the code leaked, replace it with a new random one under{" "}
+          <Link className="text-primary underline underline-offset-4" href={HREF.settings}>
+            Settings → Rotate
+          </Link>
+          , then paste the code here again.
+        </p>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -120,9 +145,11 @@ function InvocationName() {
   );
 }
 
-export function SkillStep({ step, steps }: { step: Step; steps: Step[] }) {
+export function SkillStep({ part: slug }: { part: SkillPart }) {
   const { status } = useBridge();
-  const [part, setPart] = useState(0);
+  const setup = useSetup();
+  const router = useRouter();
+  const part = SKILL_PARTS.findIndex((p) => p.slug === slug);
   // The files contain the signing secret: fetch them only when a part needs them.
   const [skill, setSkill] = useState<SkillResponse | null>(null);
   const publicBaseUrl = status?.settings.publicBaseUrl;
@@ -138,7 +165,9 @@ export function SkillStep({ step, steps }: { step: Step; steps: Step[] }) {
     };
   }, [needsFiles, publicBaseUrl, invocationName]);
 
-  if (!status) return null;
+  if (!status || !setup) return null;
+  const { steps } = setup;
+  const step = steps[2];
 
   const header = (
     <ViewHeader
@@ -155,7 +184,7 @@ export function SkillStep({ step, steps }: { step: Step; steps: Step[] }) {
         <NeedsStep step={steps[0]} title="Set the public URL first">
           The skill code contains the stream&apos;s public address.
         </NeedsStep>
-        <StepFooter back={{ label: "Amazon account", onClick: () => navigate("amazon") }} />
+        <StepFooter back={{ label: "Amazon account", href: HREF.amazon }} />
       </>
     );
   }
@@ -192,7 +221,7 @@ export function SkillStep({ step, steps }: { step: Step; steps: Step[] }) {
           Replace everything in the editor with this, then press <b>Save</b>.
         </p>
       </Instructions>
-      {skill ? <CopyBlock label="Interaction model (JSON)" value={skill.interactionModel} /> : files}
+      {skill ? <CodeBlock label="Interaction model (JSON)" code={skill.interactionModel} lang="json" /> : files}
       <InvocationName />
     </div>,
     <Instructions key="audio" path={["Build", "Interfaces"]}>
@@ -203,11 +232,11 @@ export function SkillStep({ step, steps }: { step: Step; steps: Step[] }) {
     <div key="code" className="space-y-4">
       <Instructions path={["Code", "lambda/index.js"]}>
         <p>
-          Replace everything in the file with this, then press <b>Save</b> and <b>Deploy</b>. It contains the secret that signs stream links: keep it
-          private.
+          Replace everything in the file with this, then press <b>Save</b> and <b>Deploy</b>.
         </p>
       </Instructions>
-      {skill ? <CopyBlock label="lambda/index.js" value={skill.indexJs} secret /> : files}
+      {skill ? <CodeBlock label="lambda/index.js" code={skill.indexJs} lang="javascript" secret /> : files}
+      <SecretNote />
     </div>,
     <Instructions key="test" path={["Test"]}>
       <p>
@@ -217,22 +246,23 @@ export function SkillStep({ step, steps }: { step: Step; steps: Step[] }) {
     </Instructions>,
   ];
 
-  const last = part === PARTS.length - 1;
+  const previous = SKILL_PARTS[part - 1];
+  const next = SKILL_PARTS[part + 1];
   return (
     <>
       {header}
-      <PartTabs part={part} onSelect={setPart} />
+      <PartTabs part={part} />
       {content[part]}
       <StepFooter
-        back={part === 0 ? { label: "Amazon account", onClick: () => navigate("amazon") } : { label: PARTS[part - 1], onClick: () => setPart(part - 1) }}
+        back={previous ? { label: previous.label, href: `/setup/skill/${previous.slug}` } : { label: "Amazon account", href: HREF.amazon }}
         next={
-          !last
-            ? { label: PARTS[part + 1], onClick: () => setPart(part + 1) }
+          next
+            ? { label: next.label, href: `/setup/skill/${next.slug}` }
             : {
                 label: step.done ? "Continue" : "The skill is deployed",
                 onClick: () => {
                   setSkillConfirmed(true);
-                  navigate("echos");
+                  router.push(HREF.echos);
                 },
               }
         }

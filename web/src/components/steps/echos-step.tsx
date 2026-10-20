@@ -10,10 +10,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { useBridge } from "@/hooks/use-bridge";
 import { useSyncedState } from "@/hooks/use-synced-state";
-import { navigate } from "@/hooks/use-view";
+import { useSetup } from "@/hooks/use-setup";
 import { api, type ReceiverView } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { Step } from "@/lib/setup";
+import { HREF } from "@/lib/setup";
 
 interface Row {
   serial: string;
@@ -102,9 +102,12 @@ function EchoRow({ row, receiver, skillReady }: { row: Row; receiver?: ReceiverV
   );
 }
 
-export function EchosStep({ step, steps }: { step: Step; steps: Step[] }) {
+export function EchosStep() {
   const { status, devices } = useBridge();
-  if (!status) return null;
+  const setup = useSetup();
+  if (!status || !setup) return null;
+  const { steps } = setup;
+  const step = steps[3];
   const receivers = new Map(status.receivers.map((r) => [r.serial, r]));
   const rows: Row[] = devices.map((d) => ({ serial: d.serial, name: d.name, online: d.online }));
   for (const r of status.receivers) {
@@ -153,8 +156,8 @@ export function EchosStep({ step, steps }: { step: Step; steps: Step[] }) {
       />
       {body}
       <StepFooter
-        back={{ label: "Alexa skill", onClick: () => navigate("skill") }}
-        next={{ label: step.done ? "Finish" : "Skip for now", secondary: !step.done, onClick: () => navigate("speakers") }}
+        back={{ label: "Alexa skill", href: HREF.skill }}
+        next={{ label: step.done ? "Finish" : "Skip for now", secondary: !step.done, href: HREF.speakers }}
       />
     </>
   );
