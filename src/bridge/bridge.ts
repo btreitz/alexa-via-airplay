@@ -279,6 +279,7 @@ export class Bridge extends EventEmitter {
         ...base,
         mapped: this.mapper.isMapped(entry.serial),
         echoName: device?.name,
+        echoModel: device?.model,
         echoOnline: device?.online,
         session: this.sessions?.snapshot(base.id) ?? null,
         test: this.tests.has(entry.serial) ? { secondsLeft: Math.max(0, Math.ceil((this.tests.get(entry.serial)!.endsAt - Date.now()) / 1000)) } : null,

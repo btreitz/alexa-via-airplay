@@ -9,6 +9,7 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import { errorMessage, logger } from "../lib/log.ts";
+import { modelName } from "./device-models.ts";
 
 const require = createRequire(import.meta.url);
 const log = logger("alexa");
@@ -39,6 +40,8 @@ export interface AlexaDevice {
   name: string;
   family: string;
   type: string;
+  /** e.g. "Echo Dot (5th gen)"; null for device types we don't know. */
+  model: string | null;
   online: boolean;
 }
 
@@ -62,7 +65,7 @@ const EXCLUDED_FAMILIES = new Set(["WHA", "UNKNOWN", "VOX", "TABLET", "MSHOP"]);
 export function playableDevices(raw: Iterable<AlexaDeviceRaw>): AlexaDevice[] {
   return [...raw]
     .filter((d) => d.capabilities?.includes("AUDIO_PLAYER") && !EXCLUDED_FAMILIES.has(d.deviceFamily))
-    .map((d) => ({ serial: d.serialNumber, name: d.accountName, family: d.deviceFamily, type: d.deviceType, online: d.online }))
+    .map((d) => ({ serial: d.serialNumber, name: d.accountName, family: d.deviceFamily, type: d.deviceType, model: modelName(d.deviceType), online: d.online }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 

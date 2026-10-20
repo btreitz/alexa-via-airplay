@@ -53,11 +53,18 @@ export function TestSoundButton({ receiver, disabled }: { receiver: ReceiverView
   const test = receiver.test;
   const sounding = Boolean(test && receiver.listeners.length > 0);
 
+  if (test && !sounding) {
+    // The Echo is opening the skill; there is nothing to stop yet.
+    return (
+      <Button size="sm" variant="secondary" disabled>
+        <Spinner /> Starting test…
+      </Button>
+    );
+  }
   if (test) {
     return (
       <Button size="sm" variant="secondary" disabled={busy} onClick={() => act(() => api.stop(receiver.serial), "Test stopped")}>
-        {sounding ? <SquareIcon className="fill-current" /> : <Spinner />}
-        {sounding ? `Stop · ${test.secondsLeft} s` : "Starting… Stop"}
+        <SquareIcon className="fill-current" /> Stop test · {test.secondsLeft} s
       </Button>
     );
   }

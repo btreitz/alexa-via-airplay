@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useSetup } from "@/hooks/use-setup";
 import { api, type ReceiverView } from "@/lib/api";
-import { echoRows, onlineLabel, type EchoRow } from "@/lib/echos";
+import { echoDetails, echoRows, type EchoRow } from "@/lib/echos";
 import { HREF } from "@/lib/setup";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +61,7 @@ function Row({ row, skillReady }: { row: EchoRow; skillReady: boolean }) {
       <AirPlaySwitch serial={row.serial} echoName={row.name} on={Boolean(receiver)} />
       <div className="min-w-0">
         <div className="truncate text-sm font-medium">{row.name}</div>
-        <div className="text-muted-foreground text-xs">{onlineLabel(row.online)}</div>
+        <div className="text-muted-foreground truncate text-xs">{echoDetails(row)}</div>
       </div>
       {receiver ? (
         <>

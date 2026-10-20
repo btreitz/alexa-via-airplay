@@ -1,6 +1,6 @@
 "use client";
 
-import { PencilIcon, SpeakerIcon, SquareIcon, Volume2Icon } from "lucide-react";
+import { SpeakerIcon, SquareIcon, Volume2Icon } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { AirPlayNameInput, AirPlaySwitch, TestSoundButton, useSpeakerAction } from "@/components/bridge/speaker-controls";
@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useBridge } from "@/hooks/use-bridge";
 import { useSetup } from "@/hooks/use-setup";
 import { api, type ReceiverView } from "@/lib/api";
-import { echoRows, onlineLabel, type EchoRow } from "@/lib/echos";
+import { echoDetails, echoRows, type EchoRow } from "@/lib/echos";
 import { HREF } from "@/lib/setup";
 import { cn } from "@/lib/utils";
 
@@ -69,18 +69,6 @@ function SpeakerState({ receiver }: { receiver: ReceiverView }) {
   );
 }
 
-/** The AirPlay name as a title; the pencil turns it into an input. */
-function EditableName({ receiver, echoName }: { receiver: ReceiverView; echoName: string }) {
-  const [editing, setEditing] = useState(false);
-  if (editing) return <AirPlayNameInput receiver={receiver} echoName={echoName} autoFocus className="h-8" onDone={() => setEditing(false)} />;
-  return (
-    <button type="button" onClick={() => setEditing(true)} className="group/name flex max-w-full items-center gap-2 text-left" aria-label={`Rename ${receiver.name}`}>
-      <span className="truncate text-base font-medium">{receiver.name}</span>
-      <PencilIcon className="text-muted-foreground size-3.5 shrink-0 opacity-0 transition-opacity group-hover/name:opacity-100 group-focus-visible/name:opacity-100" />
-    </button>
-  );
-}
-
 function SpeakerCard({ row, receiver, signedIn }: { row: EchoRow; receiver: ReceiverView; signedIn: boolean }) {
   const { run } = useBridge();
   const { busy, act } = useSpeakerAction();
@@ -101,9 +89,15 @@ function SpeakerCard({ row, receiver, signedIn }: { row: EchoRow; receiver: Rece
             <SpeakerIcon className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <EditableName receiver={receiver} echoName={row.name} />
-            <CardDescription className="truncate">
-              Echo “{row.name}” · {onlineLabel(row.online)}
+            {/* Always an input, styled as the title: click the name and type. */}
+            <AirPlayNameInput
+              receiver={receiver}
+              echoName={row.name}
+              className="hover:border-input -ml-2 h-8 border-transparent bg-transparent px-2 text-base font-medium shadow-none md:text-base dark:bg-transparent dark:hover:bg-input/30"
+            />
+            <CardDescription>
+              {/* The Echo's own name only when the AirPlay name differs from it. */}
+              {receiver.name === row.name ? echoDetails(row) : `Echo “${row.name}” · ${echoDetails(row)}`}
             </CardDescription>
           </div>
         </div>
@@ -152,7 +146,7 @@ function OtherEcho({ row }: { row: EchoRow }) {
       </span>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm">{row.name}</div>
-        <div className="text-muted-foreground text-xs">{onlineLabel(row.online)}</div>
+        <div className="text-muted-foreground truncate text-xs">{echoDetails(row)}</div>
       </div>
       <AirPlaySwitch serial={row.serial} echoName={row.name} on={false} />
     </div>

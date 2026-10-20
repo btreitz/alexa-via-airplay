@@ -16,6 +16,7 @@ export type { AlexaDevice, AlexaState, Check, HomeIpStatus, PublicUrlResult, Rec
 export interface ReceiverView extends ReceiverStatus {
   mapped: boolean;
   echoName?: string;
+  echoModel?: string | null;
   echoOnline?: boolean;
   session: SessionSnapshot | null;
   /** A running speaker test (chime on the Echo). */
