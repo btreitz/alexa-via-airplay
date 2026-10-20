@@ -219,6 +219,7 @@ export class UiServer {
         settings: {
           publicBaseUrl: bridge.publicBaseUrl ?? null,
           publicBaseUrlFromEnv: Boolean(bridge.config.publicBaseUrl),
+          publicUrlVerifiedAt: state.publicUrlVerifiedAt ?? null,
           invocationName: state.invocationName,
           idleTimeoutSeconds: state.idleTimeoutSeconds,
           forwardVolume: state.forwardVolume,

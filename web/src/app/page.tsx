@@ -40,7 +40,9 @@ function App() {
   const skillConfirmed = useSkillConfirmed();
   const hashView = useView();
   const steps = status ? setupSteps(status, devices, skillConfirmed) : null;
-  const initial = steps ? defaultView(steps) : null;
+  // Wait while Amazon reconnects after a restart, or the user would land on step 2.
+  const settled = status && status.alexa.status !== "connecting";
+  const initial = steps && settled ? defaultView(steps) : null;
 
   // Pick the starting view once, so finishing a step doesn't move the user by itself.
   useEffect(() => {

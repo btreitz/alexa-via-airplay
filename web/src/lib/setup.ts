@@ -21,7 +21,8 @@ export interface Step {
 export function setupSteps(status: StatusResponse, devices: DeviceView[], skillConfirmed: boolean): Step[] {
   const { settings, publicUrlCheck: check, alexa, receivers } = status;
   const host = settings.publicBaseUrl ? new URL(settings.publicBaseUrl).host : null;
-  const urlDone = Boolean(check?.ok);
+  // After a restart the bridge re-checks the URL; until then the last success counts.
+  const urlDone = check ? check.ok : Boolean(settings.publicUrlVerifiedAt);
   const amazonDone = alexa.status === "ready";
   // A mapped receiver means the skill has fetched the stream at least once.
   const skillDone = skillConfirmed || receivers.some((r) => r.mapped);

@@ -23,6 +23,8 @@ export interface ReceiverView extends ReceiverStatus {
 export interface Settings {
   publicBaseUrl: string | null;
   publicBaseUrlFromEnv: boolean;
+  /** When the current URL last passed a check; survives restarts, unlike publicUrlCheck. */
+  publicUrlVerifiedAt: string | null;
   invocationName: string;
   idleTimeoutSeconds: number;
   forwardVolume: boolean;
