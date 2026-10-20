@@ -16,3 +16,6 @@ alexa-cookie*.json
 docs/
 
 .DS_Store
+
+# Written by `next dev` on every start
+web/AGENTS.md
