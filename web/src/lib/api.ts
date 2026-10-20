@@ -8,9 +8,9 @@ import type {
   SettingsUpdate,
   SkillResponse,
   StatusResponse,
-} from "@bridge/api-types.ts";
+} from "@bridge/ui/api-types.ts";
 
-export type * from "@bridge/api-types.ts";
+export type * from "@bridge/ui/api-types.ts";
 
 async function request<T = { ok: true }>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {

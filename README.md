@@ -89,20 +89,19 @@ In production the UI is a static export served by the bridge itself, on the
 same origin as the API; no Next.js server runs. Its CSP lists the hashes of
 the page's inline scripts instead of allowing inline scripts in general.
 
-`src/` overview:
+`src/` layout:
 
-| File | Role |
+| Folder | Role |
 |---|---|
-| `main.ts` | Wires everything together |
-| `bridge.ts` | Receiver selection, triggering Echos, device mapping |
-| `receiver.ts`, `audio.ts` | Shairport Sync per Echo, PCM → MP3 broadcast |
-| `system-services.ts`, `supervisor.ts` | dbus, Avahi, NQPTP; process supervision |
-| `event-bus.ts`, `session.ts` | Receiver events over loopback MQTT; start/stop/volume logic |
-| `alexa.ts` | Amazon login and commands (alexa-remote2) |
-| `public-server.ts`, `signing.ts`, `public-ip.ts`, `client-ip.ts` | Public listener and its checks |
-| `skill.ts` | Generated skill code and interaction model |
-| `ui-server.ts`, `static-site.ts`, `api-types.ts` | LAN API, UI file serving, API types shared with `web/` |
-| `checks.ts`, `public-url-check.ts`, `tunnel.ts` | Startup checks, URL check, built-in cloudflared |
+| `main.ts`, `config.ts`, `state.ts` | Entry point, environment config, persisted settings |
+| `lib/` | Logging, child-process supervision |
+| `bridge/` | Orchestration: receiver selection, triggering Echos, device mapping, session logic (start/stop/volume) |
+| `airplay/` | Shairport Sync per Echo, PCM → MP3 broadcast, dbus/Avahi/NQPTP, receiver events over loopback MQTT, host checks |
+| `alexa/` | Amazon login and commands (alexa-remote2), generated skill code |
+| `public/` | Public stream listener and its checks (signed URLs, home IP, client IP), URL check, built-in cloudflared |
+| `ui/` | LAN API, UI file serving, API types shared with `web/` |
+
+Tests in `test/` mirror this layout.
 
 Background: [docs/PLAN.md](docs/PLAN.md) (design and decisions) and
 [docs/spikes/](docs/spikes/) plus [spikes/](spikes/) (the experiments that
