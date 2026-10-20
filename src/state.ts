@@ -43,7 +43,7 @@ export function newSecret(): string {
   return crypto.randomBytes(32).toString("base64url");
 }
 
-function defaults(): State {
+export function defaults(): State {
   return {
     version: 1,
     signingSecret: newSecret(),
@@ -68,6 +68,13 @@ export class StateStore extends EventEmitter {
 
   get(): Readonly<State> {
     return this.state;
+  }
+
+  /** Replaces everything, e.g. with imported settings. */
+  replace(next: State): void {
+    this.state = structuredClone(next);
+    this.save();
+    this.emit("change", this.state);
   }
 
   update(change: (draft: State) => void): State {

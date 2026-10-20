@@ -3,6 +3,7 @@
 import { ChevronRightIcon } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Section, StepFooter, ViewHeader } from "@/components/shell/view";
+import { SettingsImport } from "@/components/bridge/settings-import";
 import { StatusLine } from "@/components/shell/status";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -47,6 +48,8 @@ export function PublicUrlStep() {
       />
 
       <div className="space-y-8">
+        {/* First, because it can replace the whole setup. */}
+        <SettingsImport />
         <form onSubmit={saveAndCheck}>
           <Field>
             <FieldLabel htmlFor="public-url">Public base URL</FieldLabel>

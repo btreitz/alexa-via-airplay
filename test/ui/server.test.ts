@@ -95,3 +95,23 @@ test("request bodies must be JSON objects with the right types", async () => {
   assert.equal(res.status, 400);
   assert.match((await res.json()).error, /name must be a string/);
 });
+
+test("settings export and import: dry run first, then apply", async () => {
+  const post = (body: unknown) =>
+    fetch(`${base}/api/settings/import`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const exported = await (await fetch(`${base}/api/settings/export`)).json();
+  assert.equal(exported.state.signingSecret, bridge.store.get().signingSecret);
+
+  const changed = { ...exported, state: { ...exported.state, idleTimeoutSeconds: 300 } };
+  const dry = await (await post({ file: changed })).json();
+  assert.equal(dry.applied, false);
+  assert.notEqual(bridge.store.get().idleTimeoutSeconds, 300);
+
+  const bad = await post({ file: { hello: "world" } });
+  assert.equal(bad.status, 400);
+  assert.match((await bad.json()).error, /settings file/);
+
+  const applied = await (await post({ file: changed, apply: true })).json();
+  assert.equal(applied.applied, true);
+  assert.equal(bridge.store.get().idleTimeoutSeconds, 300);
+});

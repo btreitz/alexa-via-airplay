@@ -1,13 +1,12 @@
 "use client";
 
-import { SpeakerIcon, SquareIcon, Volume2Icon } from "lucide-react";
+import { SpeakerIcon, Volume2Icon } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { AirPlayNameInput, AirPlaySwitch, TestSoundButton, useSpeakerAction } from "@/components/bridge/speaker-controls";
+import { AirPlayNameInput, AirPlaySwitch, TestSoundButton } from "@/components/bridge/speaker-controls";
 import { VolumeControl } from "@/components/bridge/volume-control";
 import { NeedsStep, ToneIcon } from "@/components/shell/status";
 import { Section, ViewHeader } from "@/components/shell/view";
-import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useBridge } from "@/hooks/use-bridge";
@@ -51,9 +50,6 @@ function SpeakerState({ receiver }: { receiver: ReceiverView }) {
     icon = <Spinner />;
     text = "Starting the Echo…";
     color = "text-foreground";
-  } else if (session?.suppressed) {
-    icon = <SquareIcon className="size-3.5" />;
-    text = "Stopped on the Echo · press play on your iPhone to restart";
   } else if (connected || session?.active) {
     icon = <span className="bg-muted-foreground size-2 rounded-full" />;
     text = "Paused";
@@ -71,7 +67,6 @@ function SpeakerState({ receiver }: { receiver: ReceiverView }) {
 
 function SpeakerCard({ row, receiver, signedIn }: { row: EchoRow; receiver: ReceiverView; signedIn: boolean }) {
   const { run } = useBridge();
-  const { busy, act } = useSpeakerAction();
   const [volume, setVolume] = useState<number | null>(null);
   const playing = receiver.listeners.length > 0 && receiver.audio.active && !receiver.test;
   const shown = volume ?? receiver.session?.volume ?? 30;
@@ -127,11 +122,6 @@ function SpeakerCard({ row, receiver, signedIn }: { row: EchoRow; receiver: Rece
       </CardContent>
       <CardFooter className="gap-2 border-t">
         <TestSoundButton receiver={receiver} disabled={!signedIn} />
-        {receiver.listeners.length > 0 && !receiver.test && (
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => act(() => api.stop(receiver.serial), "Echo stopped")}>
-            <SquareIcon className="fill-current" /> Stop the Echo
-          </Button>
-        )}
       </CardFooter>
     </Card>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { DownloadIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { ConfirmButton } from "@/components/bridge/confirm-button";
@@ -48,6 +49,17 @@ export function SettingsPage() {
     if (!idleState.dirty) return;
     if (Number(idle) !== settings.idleTimeoutSeconds) await save({ idleTimeoutSeconds: Number(idle) });
     idleState.reset();
+  }
+
+  async function exportSettings() {
+    const file = await run(() => api.exportSettings());
+    if (!file) return;
+    const blob = new Blob([`${JSON.stringify(file, null, 2)}\n`], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `alexa-via-airplay-settings-${file.exportedAt.slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   }
 
   async function rotate() {
@@ -99,6 +111,24 @@ export function SettingsPage() {
             >
               Rotate
             </ConfirmButton>
+          </Row>
+        </Group>
+
+        <Group title="Move to another host">
+          <Row
+            label="Export settings"
+            description={
+              <>
+                A .json file with everything this bridge has set up: the public URL, the skill&apos;s invocation name and signing secret, the Amazon
+                site, your speakers (names and AirPlay IDs) and which Echo is which, and the playback and security settings. Import it at the start
+                of the setup on the new host. Not included: the Amazon sign-in and the tunnel token in .env. The file contains the signing secret:
+                keep it private.
+              </>
+            }
+          >
+            <Button variant="outline" onClick={exportSettings}>
+              <DownloadIcon /> Export
+            </Button>
           </Row>
         </Group>
 

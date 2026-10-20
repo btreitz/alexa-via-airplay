@@ -109,6 +109,15 @@ open the web UI at **`http://<host>:8098/`**.
 All state (settings, Amazon session, signing secret) lives in the `data`
 volume. Back it up like any other secret; never commit it.
 
+Moving to another host: export the settings in the web UI (Settings →
+Export settings) and import the file at the start of the setup on the new
+host (step 1, "Import settings"). The file holds the public URL, the
+skill's invocation name and signing secret, the Amazon site, the speakers
+and which Echo is which, and the playback and security settings, so the
+deployed skill keeps working. Not in the file: the Amazon sign-in (sign in
+again) and `.env`. The raw `state.json` from the old `data` volume works
+as an import too.
+
 ## 4. Enter and check the public URL
 
 In the UI under **Public URL**, enter the HTTPS base URL, e.g.

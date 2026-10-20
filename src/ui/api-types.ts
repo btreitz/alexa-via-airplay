@@ -12,6 +12,7 @@ import type { SystemHealth } from "../airplay/system-services.ts";
 import type { TunnelStatus } from "../public/tunnel.ts";
 
 export type { AlexaDevice, AlexaState, Check, HomeIpStatus, PublicUrlResult, ReceiverStatus, RequestRecord, SessionSnapshot };
+export type { ImportSummary, SettingsFile } from "../settings-file.ts";
 
 export interface ReceiverView extends ReceiverStatus {
   mapped: boolean;

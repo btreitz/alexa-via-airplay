@@ -4,6 +4,8 @@
 import type {
   AlexaState,
   DeviceView,
+  ImportSummary,
+  SettingsFile,
   PublicUrlResult,
   SettingsUpdate,
   SkillResponse,
@@ -33,6 +35,9 @@ export const api = {
   login: (amazonPage: string) => request<AlexaState>("POST", "/api/alexa/login", { amazonPage }),
   logout: () => request<AlexaState>("POST", "/api/alexa/logout"),
   updateSettings: (update: SettingsUpdate) => request("PUT", "/api/settings", update),
+  exportSettings: () => request<SettingsFile>("GET", "/api/settings/export"),
+  /** Without `apply` the bridge only checks the file and says what it would import. */
+  importSettings: (file: unknown, apply: boolean) => request<{ summary: ImportSummary; applied: boolean }>("POST", "/api/settings/import", { file, apply }),
   checkPublicUrl: () => request<PublicUrlResult>("POST", "/api/public-url/check"),
   skill: () => request<SkillResponse>("GET", "/api/skill"),
   rotateSecret: () => request("POST", "/api/secret/rotate"),

@@ -11,6 +11,7 @@ import type { Bridge } from "../bridge/bridge.ts";
 import { errorMessage, logger } from "../lib/log.ts";
 import { interactionModel, launchPhrase, normalizeBaseUrl, skillIndexJs, streamUrl, validateInvocationName } from "../alexa/skill.ts";
 import { newSecret, type State } from "../state.ts";
+import { exportSettings, parseSettingsFile, type ImportSummary, type SettingsFile } from "../settings-file.ts";
 import type { PublicServer } from "../public/server.ts";
 import { checkPublicUrl } from "../public/url-check.ts";
 import { StaticSite } from "./static-site.ts";
@@ -300,6 +301,31 @@ export class UiServer {
       }
       store.update((s) => changes.forEach((apply) => apply(s)));
       return { ok: true };
+    });
+
+    // The whole state, signing secret included: for moving the bridge elsewhere.
+    r.add("GET", "/api/settings/export", (): SettingsFile => {
+      log.info("settings exported");
+      return exportSettings(store.get());
+    });
+
+    // Without `apply` only checks the file and returns what it would import.
+    r.add("POST", "/api/settings/import", async ({ body }): Promise<{ summary: ImportSummary; applied: boolean }> => {
+      const { state, summary } = parseSettingsFile(body.file);
+      if (body.apply !== true) return { summary, applied: false };
+      store.replace(state);
+      bridge.publicUrlCheck = null;
+      await bridge.reconcile();
+      log.info("settings imported", { speakers: state.receivers.length });
+      // A URL that worked before the move gets checked again right away.
+      const base = bridge.publicBaseUrl;
+      if (base && state.publicUrlVerifiedAt) {
+        checkPublicUrl(base, this.publicServer, bridge.homeIp).then(
+          (result) => (bridge.publicUrlCheck = result),
+          (err) => log.warn("public URL check after import failed", { error: errorMessage(err) }),
+        );
+      }
+      return { summary, applied: true };
     });
 
     r.add("POST", "/api/receivers", async ({ body }) => bridge.addReceiver(requireString(body, "serial"), optionalString(body, "name")));
