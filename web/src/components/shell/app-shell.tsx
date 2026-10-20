@@ -9,11 +9,11 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { AppSidebar } from "@/components/shell/app-sidebar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
 import { useBridge } from "@/hooks/use-bridge";
 import { useSetup } from "@/hooks/use-setup";
 import { blockingProblems, viewOf } from "@/lib/setup";
-import { cn } from "@/lib/utils";
 
 function Problems({ problems }: { problems: string[] }) {
   if (problems.length === 0) return null;
@@ -50,28 +50,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const playing = status.receivers.filter((r) => r.listeners.length > 0).length;
 
   return (
-    <div className="grid min-h-svh md:grid-cols-[17rem_minmax(0,1fr)]">
-      <AppSidebar
-        steps={steps}
-        view={viewOf(pathname)}
-        playing={playing}
-        problems={problems.length}
-        footer={
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className={cn("size-2 rounded-full", problems.length ? "bg-destructive" : "bg-emerald-500")} />
-              <span className="text-foreground">{problems.length ? `${problems.length} problem${problems.length === 1 ? "" : "s"}` : "Bridge running"}</span>
-            </div>
-            <div>Setup guide: SETUP.md · LAN only</div>
+    <SidebarProvider>
+      <AppSidebar steps={steps} view={viewOf(pathname)} playing={playing} problems={problems.length} />
+      <SidebarInset>
+        {/* On phones the sidebar is a sheet; this opens it. */}
+        <header className="flex h-12 items-center border-b px-3 md:hidden">
+          <SidebarTrigger />
+        </header>
+        <div className="px-6 py-10 md:px-12">
+          <div className="mx-auto max-w-3xl">
+            <Problems problems={problems} />
+            {children}
           </div>
-        }
-      />
-      <main className="px-6 py-10 md:px-12">
-        <div className="mx-auto max-w-3xl">
-          <Problems problems={problems} />
-          {children}
         </div>
-      </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
