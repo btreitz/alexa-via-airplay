@@ -13,8 +13,9 @@ import { echoDetails, echoRows, type EchoRow } from "@/lib/echos";
 import { HREF } from "@/lib/setup";
 import { cn } from "@/lib/utils";
 
-// Switch | Echo | AirPlay name | identification | test: one grid so the rows line up like a table.
-const GRID = "grid grid-cols-[2.5rem_minmax(0,1fr)_12rem_9.5rem_9rem] items-center gap-4";
+// From md up: switch | Echo | AirPlay name | identification | test, one grid so the rows line up like a
+// table. Below that each Echo stacks: switch and Echo, then the name, then identification and test.
+const COLUMNS = "grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-3 md:grid-cols-[2.5rem_minmax(0,1fr)_12rem_9.5rem_9rem]";
 
 /** Whether the bridge knows which Alexa device this is, and the way to (re)learn it. */
 function Identification({ receiver, skillReady }: { receiver: ReceiverView; skillReady: boolean }) {
@@ -57,7 +58,7 @@ function Identification({ receiver, skillReady }: { receiver: ReceiverView; skil
 function Row({ row, skillReady }: { row: EchoRow; skillReady: boolean }) {
   const { receiver } = row;
   return (
-    <div className={cn(GRID, "px-4 py-3")}>
+    <div className={cn("grid", COLUMNS, "px-4 py-3")}>
       <AirPlaySwitch serial={row.serial} echoName={row.name} on={Boolean(receiver)} />
       <div className="min-w-0">
         <div className="truncate text-sm font-medium">{row.name}</div>
@@ -65,12 +66,15 @@ function Row({ row, skillReady }: { row: EchoRow; skillReady: boolean }) {
       </div>
       {receiver ? (
         <>
-          <AirPlayNameInput receiver={receiver} echoName={row.name} />
-          <Identification receiver={receiver} skillReady={skillReady} />
-          <TestSoundButton receiver={receiver} disabled={!skillReady} />
+          <AirPlayNameInput receiver={receiver} echoName={row.name} className="col-span-2 md:col-span-1" />
+          {/* One line on phones; on wider screens its two parts are table cells (md:contents). */}
+          <div className="col-span-2 flex items-center justify-between gap-4 md:contents">
+            <Identification receiver={receiver} skillReady={skillReady} />
+            <TestSoundButton receiver={receiver} disabled={!skillReady} />
+          </div>
         </>
       ) : (
-        <span className="text-muted-foreground col-span-3 text-xs">Not on AirPlay</span>
+        <span className="text-muted-foreground hidden text-xs md:col-span-3 md:block">Not on AirPlay</span>
       )}
     </div>
   );
@@ -102,7 +106,7 @@ export function EchosStep() {
           </StatusLine>
         )}
         <div className="divide-y rounded-lg border">
-          <div className={cn(GRID, "text-muted-foreground px-4 py-2 text-xs font-medium")}>
+          <div className={cn("hidden md:grid", COLUMNS, "text-muted-foreground px-4 py-2 text-xs font-medium")}>
             <span>AirPlay</span>
             <span>Echo</span>
             <span>Name on your iPhone</span>
