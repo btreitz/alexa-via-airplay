@@ -40,7 +40,7 @@ HTTPS), and the Amazon account that owns the Echos.
    generated files, select your Echos.
 
 The full walkthrough, including the security model, troubleshooting and
-limits, is in **[docs/setup.md](docs/setup.md)**. All options are listed in
+limits, is in **[SETUP.md](SETUP.md)**. All options are listed in
 [`.env.example`](.env.example).
 
 ## Ports
@@ -102,10 +102,6 @@ the page's inline scripts instead of allowing inline scripts in general.
 | `ui/` | LAN API, UI file serving, API types shared with `web/` |
 
 Tests in `test/` mirror this layout.
-
-Background: [docs/PLAN.md](docs/PLAN.md) (design and decisions) and
-[docs/spikes/](docs/spikes/) plus [spikes/](spikes/) (the experiments that
-proved the approach).
 
 ## Status
 

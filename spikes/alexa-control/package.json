@@ -1,8 +1,0 @@
-{
-  "name": "alexa-control-spike",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "alexa-remote2": "8.1.1"
-  }
-}

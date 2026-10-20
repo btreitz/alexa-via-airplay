@@ -12,7 +12,7 @@ data/
 cookie*.json
 alexa-cookie*.json
 
-# Local spike scratch
-spikes/**/data/
+# Local notes: plan and spike references (not part of the repository)
+docs/
 
 .DS_Store

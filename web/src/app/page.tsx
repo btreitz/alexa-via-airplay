@@ -31,7 +31,7 @@ function Dashboard() {
         </div>
       </main>
       <footer className="text-muted-foreground px-6 pb-6 text-center text-xs">
-        Setup guide: <code>docs/setup.md</code> in the repository · LAN only, never publish this page.
+        Setup guide: <code>SETUP.md</code> in the repository · LAN only, never publish this page.
       </footer>
     </>
   );
