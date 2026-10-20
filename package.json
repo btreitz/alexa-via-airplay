@@ -13,15 +13,20 @@
     "dev:web": "pnpm --filter @alexa-via-airplay/web dev",
     "typecheck": "tsc && pnpm --filter @alexa-via-airplay/web typecheck",
     "test": "LOG_LEVEL=error node --disable-warning=ExperimentalWarning --test 'test/**/*.test.ts'",
-    "check": "pnpm typecheck && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "lint": "eslint . && pnpm --filter @alexa-via-airplay/web lint"
   },
   "dependencies": {
     "aedes": "^1.2.0",
     "alexa-remote2": "8.1.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/node": "^22.18.0",
-    "typescript": "^5.9.0"
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.72.0"
   },
   "packageManager": "pnpm@11.12.0"
 }

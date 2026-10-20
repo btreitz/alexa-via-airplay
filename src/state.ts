@@ -91,7 +91,7 @@ export class StateStore extends EventEmitter {
       try {
         stored = JSON.parse(text);
       } catch (err) {
-        throw new Error(`${this.file} is not valid JSON (${(err as Error).message}). Fix or delete it.`);
+        throw new Error(`${this.file} is not valid JSON (${(err as Error).message}). Fix or delete it.`, { cause: err });
       }
     }
     const state = { ...defaults(), ...stored };

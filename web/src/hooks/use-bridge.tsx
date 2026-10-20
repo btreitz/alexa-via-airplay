@@ -63,6 +63,8 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    // Polling subscription: refresh() sets state only after its fetch resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
     const timer = setInterval(() => void refresh(), POLL_MS);
     return () => clearInterval(timer);

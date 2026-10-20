@@ -29,7 +29,8 @@ export class HttpError extends Error {
 }
 
 type Params = Record<string, string>;
-type Handler = (ctx: { req: http.IncomingMessage; params: Params; body: any }) => Promise<unknown> | unknown;
+type Body = Record<string, unknown>;
+type Handler = (ctx: { req: http.IncomingMessage; params: Params; body: Body }) => Promise<unknown> | unknown;
 interface Route {
   method: string;
   pattern: RegExp;
@@ -66,7 +67,7 @@ class Router {
   }
 }
 
-async function readJson(req: http.IncomingMessage): Promise<unknown> {
+async function readJson(req: http.IncomingMessage): Promise<Body> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {
@@ -75,11 +76,14 @@ async function readJson(req: http.IncomingMessage): Promise<unknown> {
     chunks.push(chunk as Buffer);
   }
   if (size === 0) return {};
+  let parsed: unknown;
   try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
     throw new HttpError(400, "Invalid JSON");
   }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new HttpError(400, "Expected a JSON object");
+  return parsed as Body;
 }
 
 /** The address the browser used to reach us; the Amazon login proxy link uses it. */
@@ -90,8 +94,15 @@ export function browserFacingHost(req: http.IncomingMessage): string {
   return host;
 }
 
-function requireString(body: any, key: string): string {
-  const value = body?.[key];
+function optionalString(body: Body, key: string): string | undefined {
+  const value = body[key];
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string") throw new HttpError(400, `${key} must be a string`);
+  return value;
+}
+
+function requireString(body: Body, key: string): string {
+  const value = body[key];
   if (typeof value !== "string" || !value.trim()) throw new HttpError(400, `${key} is required`);
   return value;
 }
@@ -256,7 +267,7 @@ export class UiServer {
     });
 
     r.add("PUT", "/api/settings", (ctx) => {
-      const body = ctx.body ?? {};
+      const body = ctx.body;
       const changes: Array<(s: State) => void> = [];
       if (body.publicBaseUrl !== undefined) {
         if (bridge.config.publicBaseUrl) throw new HttpError(409, "PUBLIC_BASE_URL is set in the environment");
@@ -290,7 +301,7 @@ export class UiServer {
       return { ok: true };
     });
 
-    r.add("POST", "/api/receivers", async ({ body }) => bridge.addReceiver(requireString(body, "serial"), body.name));
+    r.add("POST", "/api/receivers", async ({ body }) => bridge.addReceiver(requireString(body, "serial"), optionalString(body, "name")));
 
     r.add("PATCH", "/api/receivers/:serial", async ({ params, body }) => {
       this.receiverEntry(params.serial);
@@ -316,7 +327,7 @@ export class UiServer {
 
     r.add("POST", "/api/receivers/:serial/volume", async ({ params, body }) => {
       this.receiverEntry(params.serial);
-      const volume = Number(body?.volume);
+      const volume = Number(body.volume);
       if (!Number.isFinite(volume) || volume < 0 || volume > 100) throw new HttpError(400, "volume must be 0–100");
       await bridge.alexa.setVolume(params.serial, volume);
       return { ok: true };

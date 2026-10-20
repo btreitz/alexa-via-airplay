@@ -85,3 +85,13 @@ test("unknown API routes and methods", async () => {
   assert.equal((await fetch(`${base}/api/nope`)).status, 404);
   assert.equal((await fetch(`${base}/api/status`, { method: "DELETE", headers: { "content-type": "application/json" } })).status, 405);
 });
+
+test("request bodies must be JSON objects with the right types", async () => {
+  const post = (body: string) =>
+    fetch(`${base}/api/receivers`, { method: "POST", headers: { "content-type": "application/json" }, body });
+  assert.equal((await post("[1,2]")).status, 400);
+  assert.equal((await post('"text"')).status, 400);
+  const res = await post(JSON.stringify({ serial: "X", name: 42 }));
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /name must be a string/);
+});
