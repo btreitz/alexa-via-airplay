@@ -16,6 +16,7 @@ import type { SessionManager } from "./session.ts";
 import { Tunnel } from "../public/tunnel.ts";
 import { launchPhrase } from "../alexa/skill.ts";
 import { StateStore, type ReceiverEntry } from "../state.ts";
+import { TEST_SECONDS, TEST_VOLUME } from "./speaker-test.ts";
 import { SystemServices, waitFor } from "../airplay/system-services.ts";
 
 const log = logger("bridge");
@@ -53,6 +54,7 @@ export class Bridge extends EventEmitter {
   readonly homeIp: HomeIpMonitor;
   readonly clientIp: ClientIpResolver;
   private readonly lastTriggerAt = new Map<string, number>();
+  private readonly tests = new Map<string, { endsAt: number; timer: NodeJS.Timeout }>();
   private readonly receivers = new Map<string, Receiver>();
   private reconciling: Promise<void> = Promise.resolve();
   mqtt?: MqttSettings;
@@ -85,7 +87,9 @@ export class Bridge extends EventEmitter {
     for (const check of this.checks) (check.ok ? log.info : log.warn)(`check ${check.name}: ${check.message}`);
   }
 
+  /** Whether the Echo may stream without an AirPlay session: just triggered, or under test. */
   recentlyTriggered(serial: string): boolean {
+    if (this.tests.has(serial)) return true;
     const at = this.lastTriggerAt.get(serial);
     return at !== undefined && Date.now() - at <= TRIGGER_GRACE_MS;
   }
@@ -213,7 +217,49 @@ export class Bridge extends EventEmitter {
     return { mapped: this.mapper.isMapped(serial) };
   }
 
+  /**
+   * Plays the chime on one Echo for TEST_SECONDS, through the same path as
+   * AirPlay audio (skill, public URL, stream), so it proves the whole chain.
+   */
+  async startTest(serial: string): Promise<{ endsAt: number }> {
+    const receiver = this.receiverBySerial(serial);
+    if (!receiver) throw new Error("Not a receiver");
+    if (receiver.input.active) throw new Error("AirPlay is playing on this speaker; the test would interrupt it");
+    this.endTest(serial);
+    receiver.stream.startTone();
+    const endsAt = Date.now() + TEST_SECONDS * 1000;
+    const timer = setTimeout(() => {
+      // If AirPlay took over meanwhile, leave the Echo playing it.
+      const takenOver = this.receiverBySerial(serial)?.input.active;
+      this.endTest(serial);
+      if (!takenOver) this.stopEcho(serial).catch((err) => log.warn("stopping after the test failed", { serial, error: errorMessage(err) }));
+    }, TEST_SECONDS * 1000);
+    this.tests.set(serial, { endsAt, timer });
+    log.info("speaker test", { serial, seconds: TEST_SECONDS, volume: TEST_VOLUME });
+    try {
+      await this.alexa.setVolume(serial, TEST_VOLUME);
+      await this.triggerEcho(serial);
+    } catch (err) {
+      this.endTest(serial);
+      throw err;
+    }
+    return { endsAt };
+  }
+
+  testing(serial: string): boolean {
+    return this.tests.has(serial);
+  }
+
+  private endTest(serial: string): void {
+    const test = this.tests.get(serial);
+    if (!test) return;
+    clearTimeout(test.timer);
+    this.tests.delete(serial);
+    this.receiverBySerial(serial)?.stream.stopTone();
+  }
+
   async stopEcho(serial: string): Promise<void> {
+    this.endTest(serial);
     log.info("stopping Echo", { serial });
     await this.alexa.stopPlayback(serial);
     // A stopped Echo keeps its connection open for about a minute; end it now
@@ -235,6 +281,7 @@ export class Bridge extends EventEmitter {
         echoName: device?.name,
         echoOnline: device?.online,
         session: this.sessions?.snapshot(base.id) ?? null,
+        test: this.tests.has(entry.serial) ? { secondsLeft: Math.max(0, Math.ceil((this.tests.get(entry.serial)!.endsAt - Date.now()) / 1000)) } : null,
       };
     });
   }

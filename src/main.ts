@@ -32,6 +32,7 @@ async function main(): Promise<void> {
     remote: (id, command) => events.remote(id, command),
     settings: () => bridge.store.get(),
     canControl: () => bridge.alexa.ready,
+    testing: (serial) => bridge.testing(serial),
   });
   bridge.sessions = sessions;
   bridge.on("receiver-added", (receiver) => sessions.track(receiver.id));

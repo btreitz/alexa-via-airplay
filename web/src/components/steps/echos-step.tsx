@@ -1,119 +1,88 @@
 "use client";
 
-import { useState } from "react";
+import { RefreshCwIcon } from "lucide-react";
 import { ConfirmButton } from "@/components/bridge/confirm-button";
+import { AirPlayNameInput, AirPlaySwitch, TEST_EXPLANATION, TestSoundButton, useSpeakerAction } from "@/components/bridge/speaker-controls";
 import { NeedsStep, StatusLine } from "@/components/shell/status";
 import { StepFooter, ViewHeader } from "@/components/shell/view";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { Switch } from "@/components/ui/switch";
-import { useBridge } from "@/hooks/use-bridge";
-import { useSyncedState } from "@/hooks/use-synced-state";
 import { useSetup } from "@/hooks/use-setup";
 import { api, type ReceiverView } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { echoRows, onlineLabel, type EchoRow } from "@/lib/echos";
 import { HREF } from "@/lib/setup";
+import { cn } from "@/lib/utils";
 
-interface Row {
-  serial: string;
-  name: string;
-  online: boolean | null;
+// Switch | Echo | AirPlay name | identification | test: one grid so the rows line up like a table.
+const GRID = "grid grid-cols-[2.5rem_minmax(0,1fr)_12rem_9.5rem_9rem] items-center gap-4";
+
+/** Whether the bridge knows which Alexa device this is, and the way to (re)learn it. */
+function Identification({ receiver, skillReady }: { receiver: ReceiverView; skillReady: boolean }) {
+  const { busy, act } = useSpeakerAction();
+  if (!receiver.mapped) {
+    return (
+      <div className="space-y-1">
+        <StatusLine tone="warn">Not identified</StatusLine>
+        <Button size="xs" disabled={busy || !skillReady} onClick={() => act(() => api.trigger(receiver.serial))}>
+          {busy && <Spinner />}
+          Identify
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      <StatusLine tone="ok">Identified</StatusLine>
+      <ConfirmButton
+        size="xs"
+        variant="ghost"
+        className="text-muted-foreground -ml-2"
+        disabled={busy || !skillReady}
+        title="Identify this Echo again?"
+        description="Only needed if sound goes to the wrong Echo. The bridge forgets which Alexa device this is and opens your skill on it once more to learn it again."
+        confirmLabel="Identify again"
+        onConfirm={() =>
+          act(async () => {
+            await api.forgetMapping(receiver.serial);
+            return api.trigger(receiver.serial);
+          })
+        }
+      >
+        <RefreshCwIcon /> Identify again
+      </ConfirmButton>
+    </div>
+  );
 }
 
-// Switch | Echo | AirPlay name | identification: one grid so the rows line up like a table.
-const GRID = "grid grid-cols-[2.5rem_minmax(0,1fr)_16rem_15rem] items-center gap-4";
-
-function EchoRow({ row, receiver, skillReady }: { row: Row; receiver?: ReceiverView; skillReady: boolean }) {
-  const { run } = useBridge();
-  const [busy, setBusy] = useState(false);
-  const [name, setName, nameState] = useSyncedState(receiver?.name ?? "");
-
-  async function act(action: () => Promise<unknown>, success?: string) {
-    setBusy(true);
-    await run(action, success);
-    setBusy(false);
-  }
-
-  async function commitName() {
-    if (!nameState.dirty || !receiver) return;
-    if (name.trim() && name !== receiver.name) await act(() => api.renameReceiver(row.serial, name), "Renamed");
-    nameState.reset();
-  }
-
-  const streaming = Boolean(receiver?.listeners.length);
+function Row({ row, skillReady }: { row: EchoRow; skillReady: boolean }) {
+  const { receiver } = row;
   return (
     <div className={cn(GRID, "px-4 py-3")}>
-      <Switch
-        checked={Boolean(receiver)}
-        disabled={busy}
-        aria-label={`Use ${row.name} with AirPlay`}
-        onCheckedChange={(on) => act(() => (on ? api.addReceiver(row.serial) : api.removeReceiver(row.serial)))}
-      />
+      <AirPlaySwitch serial={row.serial} echoName={row.name} on={Boolean(receiver)} />
       <div className="min-w-0">
         <div className="truncate text-sm font-medium">{row.name}</div>
-        <div className="text-muted-foreground text-xs">{row.online === null ? "Not on this account" : row.online ? "Online" : "Offline"}</div>
+        <div className="text-muted-foreground text-xs">{onlineLabel(row.online)}</div>
       </div>
       {receiver ? (
         <>
-          <Input
-            aria-label={`AirPlay name for ${row.name}`}
-            maxLength={50}
-            value={name}
-            disabled={busy}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={commitName}
-            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          />
-          <div className="flex items-center justify-between gap-2">
-            {receiver.mapped ? (
-              <StatusLine tone="ok">Identified</StatusLine>
-            ) : (
-              <StatusLine tone="warn">Not identified</StatusLine>
-            )}
-            {streaming ? (
-              <Button size="sm" variant="outline" disabled={busy} onClick={() => act(() => api.stop(row.serial))}>
-                Stop
-              </Button>
-            ) : receiver.mapped ? (
-              <ConfirmButton
-                size="sm"
-                variant="ghost"
-                disabled={busy}
-                title="Identify this Echo again?"
-                description="The bridge forgets which Alexa device belongs to this Echo. Press Identify afterwards."
-                confirmLabel="Forget"
-                onConfirm={() => act(() => api.forgetMapping(row.serial))}
-              >
-                Redo
-              </ConfirmButton>
-            ) : (
-              <Button size="sm" disabled={busy || !skillReady} onClick={() => act(() => api.trigger(row.serial))}>
-                {busy && <Spinner />}
-                Identify
-              </Button>
-            )}
-          </div>
+          <AirPlayNameInput receiver={receiver} echoName={row.name} />
+          <Identification receiver={receiver} skillReady={skillReady} />
+          <TestSoundButton receiver={receiver} disabled={!skillReady} />
         </>
       ) : (
-        <span className="text-muted-foreground col-span-2 text-xs">Not on AirPlay</span>
+        <span className="text-muted-foreground col-span-3 text-xs">Not on AirPlay</span>
       )}
     </div>
   );
 }
 
 export function EchosStep() {
-  const { status, devices } = useBridge();
   const setup = useSetup();
-  if (!status || !setup) return null;
-  const { steps } = setup;
+  if (!setup) return null;
+  const { status, devices, steps } = setup;
   const step = steps[3];
-  const receivers = new Map(status.receivers.map((r) => [r.serial, r]));
-  const rows: Row[] = devices.map((d) => ({ serial: d.serial, name: d.name, online: d.online }));
-  for (const r of status.receivers) {
-    if (!rows.some((row) => row.serial === r.serial)) rows.push({ serial: r.serial, name: r.echoName || r.serial, online: null });
-  }
   const [, amazon, skill] = steps;
+  const rows = echoRows(devices, status.receivers);
 
   let body;
   if (!amazon.done) {
@@ -128,7 +97,7 @@ export function EchosStep() {
     body = (
       <div className="space-y-4">
         {!skill.done && (
-          <StatusLine tone="warn" detail="Identify opens your skill on the Echo, so it needs the skill from step 3.">
+          <StatusLine tone="warn" detail="Identify and Test sound open your skill on the Echo, so they need the skill from step 3.">
             The Alexa skill isn&apos;t confirmed yet.
           </StatusLine>
         )}
@@ -138,11 +107,13 @@ export function EchosStep() {
             <span>Echo</span>
             <span>Name on your iPhone</span>
             <span>Identified</span>
+            <span>Test</span>
           </div>
           {rows.map((row) => (
-            <EchoRow key={row.serial} row={row} receiver={receivers.get(row.serial)} skillReady={skill.done} />
+            <Row key={row.serial} row={row} skillReady={skill.done} />
           ))}
         </div>
+        <p className="text-muted-foreground text-xs">Test sound: {TEST_EXPLANATION}</p>
       </div>
     );
   }
@@ -152,7 +123,7 @@ export function EchosStep() {
       <ViewHeader
         eyebrow="Step 4 of 4"
         title="Echos"
-        description="Turn on the Echos that should appear as AirPlay speakers. Then press Identify on each: the Echo opens your skill once, so the bridge learns which Echo is which."
+        description="Turn on the Echos that should appear as AirPlay speakers. Press Identify on each: the Echo opens your skill once, so the bridge learns which Echo is which. Then play the test sound to hear that it works."
       />
       {body}
       <StepFooter

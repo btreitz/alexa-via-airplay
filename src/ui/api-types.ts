@@ -18,6 +18,8 @@ export interface ReceiverView extends ReceiverStatus {
   echoName?: string;
   echoOnline?: boolean;
   session: SessionSnapshot | null;
+  /** A running speaker test (chime on the Echo). */
+  test: { secondsLeft: number } | null;
 }
 
 export interface Settings {

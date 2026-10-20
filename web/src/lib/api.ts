@@ -40,6 +40,7 @@ export const api = {
   removeReceiver: (serial: string) => request("DELETE", receiver(serial)),
   renameReceiver: (serial: string, name: string) => request("PATCH", receiver(serial), { name }),
   trigger: (serial: string) => request<{ mapped: boolean }>("POST", `${receiver(serial)}/trigger`),
+  test: (serial: string) => request<{ endsAt: number }>("POST", `${receiver(serial)}/test`),
   stop: (serial: string) => request("POST", `${receiver(serial)}/stop`),
   setVolume: (serial: string, volume: number) => request("POST", `${receiver(serial)}/volume`, { volume }),
   forgetMapping: (serial: string) => request("DELETE", `${receiver(serial)}/mapping`),

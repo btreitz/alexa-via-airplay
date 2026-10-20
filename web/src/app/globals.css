@@ -142,3 +142,9 @@
     --sh-keyword: oklch(0.75 0.15 25);
     --sh-comment: oklch(0.55 0 0);
 }
+
+/* The "playing" equalizer on the speaker cards. */
+@keyframes equalizer {
+    0%, 100% { transform: scaleY(0.3); }
+    50% { transform: scaleY(1); }
+}

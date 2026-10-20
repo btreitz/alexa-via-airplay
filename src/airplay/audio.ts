@@ -1,6 +1,7 @@
 // Per receiver: raw PCM from Shairport Sync's pipe → ffmpeg MP3 → every
 // connected HTTP client. While AirPlay is paused or idle, silence keeps the
-// MP3 stream flowing, otherwise the Echo drops the connection.
+// MP3 stream flowing, otherwise the Echo drops the connection. During a
+// speaker test, a chime takes the place of that silence.
 
 import { spawn, execFileSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
@@ -17,6 +18,33 @@ const ENCODER_LINGER_MS = 15_000;
 const MAX_CLIENT_BACKLOG = 1024 * 1024;
 const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
 const SILENCE = Buffer.alloc(Math.round((BYTES_PER_SECOND * TICK_MS) / 1000 / 4) * 4);
+
+/**
+ * The test sound: two soft bell notes (A5, E5) every 1.5 s. Easy to hear and
+ * clearly not music. Its length is a whole number of ticks, so it loops cleanly.
+ */
+export function chime(): Buffer {
+  const frames = Math.round((SAMPLE_RATE * 1500) / 1000);
+  const buffer = Buffer.alloc(frames * 4);
+  const notes = [
+    { at: 0, hz: 880 },
+    { at: 0.3, hz: 659.25 },
+  ];
+  for (let i = 0; i < frames; i++) {
+    const t = i / SAMPLE_RATE;
+    let value = 0;
+    for (const note of notes) {
+      const dt = t - note.at;
+      if (dt < 0) continue;
+      const envelope = Math.min(1, dt * 200) * Math.exp(-dt * 5); // 5 ms attack, bell-like decay
+      value += envelope * (Math.sin(2 * Math.PI * note.hz * dt) + 0.3 * Math.sin(4 * Math.PI * note.hz * dt));
+    }
+    const sample = Math.round(Math.max(-1, Math.min(1, value * 0.4)) * 32767);
+    buffer.writeInt16LE(sample, i * 4);
+    buffer.writeInt16LE(sample, i * 4 + 2);
+  }
+  return buffer;
+}
 
 /**
  * Reads a FIFO without blocking a libuv threadpool thread. O_RDWR keeps the
@@ -102,6 +130,7 @@ export class Mp3Broadcaster extends EventEmitter {
   private silenceTimer?: NodeJS.Timeout;
   private lingerTimer?: NodeJS.Timeout;
   private nextId = 1;
+  private tone?: { sound: Buffer; offset: number };
 
   constructor(name: string, input: PcmInput) {
     super();
@@ -134,6 +163,26 @@ export class Mp3Broadcaster extends EventEmitter {
     if (this.clients.size === 0) {
       this.lingerTimer = setTimeout(() => this.stopEncoder(), ENCODER_LINGER_MS);
     }
+  }
+
+  /** Plays the test chime wherever silence would go, until stopTone(). */
+  startTone(): void {
+    this.tone ??= { sound: chime(), offset: 0 };
+  }
+
+  stopTone(): void {
+    this.tone = undefined;
+  }
+
+  get toneActive(): boolean {
+    return this.tone !== undefined;
+  }
+
+  private filler(): Buffer {
+    if (!this.tone) return SILENCE;
+    const { sound, offset } = this.tone;
+    this.tone.offset = (offset + SILENCE.length) % sound.length;
+    return sound.subarray(offset, offset + SILENCE.length);
   }
 
   /** Ends every current connection (a new one for the same Echo replaces them). */
@@ -175,7 +224,7 @@ export class Mp3Broadcaster extends EventEmitter {
       }
     });
     this.silenceTimer = setInterval(() => {
-      if (!this.input.active) encoder.stdin.write(SILENCE);
+      if (!this.input.active) encoder.stdin.write(this.filler());
     }, TICK_MS);
   }
 

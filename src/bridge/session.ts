@@ -55,6 +55,8 @@ export interface SessionDeps {
   settings(): { idleTimeoutSeconds: number; forwardVolume: boolean };
   /** Whether the bridge may drive Echos at all (signed in to Amazon). */
   canControl(): boolean;
+  /** A speaker test runs: it sets its own volume and ends the Echo itself. */
+  testing?(serial: string): boolean;
   now?: () => number;
   schedule?: (fn: () => void, ms: number) => { cancel(): void };
 }
@@ -214,6 +216,7 @@ export class SessionManager {
     const { idleTimeoutSeconds } = this.deps.settings();
 
     if (s.connections > 0) {
+      if (this.deps.testing?.(target.serial)) return;
       // Idle since the last audio, or since the Echo connected (e.g. a manual test start).
       const idleFor = now - Math.max(target.lastAudioAt, s.connectedAt);
       if (!s.stoppingByUs && idleFor > idleTimeoutSeconds * 1000) {
@@ -269,6 +272,7 @@ export class SessionManager {
   /** At most one volume command in flight; afterwards the latest value is sent. */
   private sendVolume(target: SessionTarget, s: ReceiverSession): void {
     if (s.volumeInFlight || s.volume === null || s.connections === 0 || s.volume === s.sentVolume) return;
+    if (this.deps.testing?.(target.serial)) return;
     const volume = s.volume;
     s.sentVolume = volume;
     s.volumeInFlight = true;

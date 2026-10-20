@@ -320,6 +320,12 @@ export class UiServer {
       return bridge.triggerEcho(params.serial);
     });
 
+    r.add("POST", "/api/receivers/:serial/test", async ({ params }) => {
+      this.receiverEntry(params.serial);
+      if (!bridge.alexa.ready) throw new HttpError(409, "Sign in to Amazon first");
+      return bridge.startTest(params.serial);
+    });
+
     r.add("POST", "/api/receivers/:serial/stop", async ({ params }) => {
       this.receiverEntry(params.serial);
       await bridge.stopEcho(params.serial);

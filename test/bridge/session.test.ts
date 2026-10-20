@@ -19,6 +19,7 @@ function harness(settings = { idleTimeoutSeconds: 60, forwardVolume: true }) {
     },
   };
   let canControl = true;
+  let testing = false;
   const sessions = new SessionManager({
     receiver: (id) => (id === "bath" ? target : undefined),
     trigger: async (serial) => calls.push(`trigger ${serial}`),
@@ -27,6 +28,7 @@ function harness(settings = { idleTimeoutSeconds: 60, forwardVolume: true }) {
     remote: (id, cmd) => calls.push(`remote ${id} ${cmd}`),
     settings: () => settings,
     canControl: () => canControl,
+    testing: () => testing,
     now: () => now,
     schedule: (fn, ms) => {
       const timer = { at: now + ms, fn, cancelled: false };
@@ -47,7 +49,12 @@ function harness(settings = { idleTimeoutSeconds: 60, forwardVolume: true }) {
       sessions.tick();
     }
   };
-  return { sessions, target, calls, advance, setCanControl: (v: boolean) => (canControl = v), get now() { return now; } };
+  return {
+    sessions, target, calls, advance,
+    setCanControl: (v: boolean) => (canControl = v),
+    setTesting: (v: boolean) => (testing = v),
+    get now() { return now; },
+  };
 }
 
 test("volume mapping", () => {
@@ -197,4 +204,16 @@ test("only one volume command in flight; the latest value follows", async () => 
   release();
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(sent, [50, 90]); // the intermediate 70 is skipped
+});
+
+test("speaker test: no idle stop and no AirPlay volume while it runs", () => {
+  const h = harness({ idleTimeoutSeconds: 10, forwardVolume: true });
+  h.sessions.onEvent("bath", "volume", "-30.00,0,0,0"); // AirPlay volume 0 must not mute the test
+  h.setTesting(true);
+  h.sessions.onStreamOpen("bath");
+  h.advance(25_000);
+  assert.equal(h.calls.length, 0, h.calls.join(", "));
+  h.setTesting(false);
+  h.advance(2000);
+  assert.ok(h.calls.includes("stop SERIAL"));
 });
