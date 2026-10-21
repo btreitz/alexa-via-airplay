@@ -123,9 +123,6 @@ export function SettingsPage() {
             />
             <span className="text-muted-foreground text-sm">seconds</span>
           </Row>
-          <Row label="Volume follows AirPlay" htmlFor="forward-volume" description="Changing the volume on your iPhone or Mac sets it on the Echo.">
-            <Switch id="forward-volume" checked={settings.forwardVolume} onCheckedChange={(on) => save({ forwardVolume: on })} />
-          </Row>
           <Row
             label="Catch up on the delay"
             htmlFor="catch-up"
@@ -149,6 +146,9 @@ export function SettingsPage() {
                 ))}
               </SelectContent>
             </Select>
+          </Row>
+          <Row label="Volume follows AirPlay" htmlFor="forward-volume" description="Changing the volume on your iPhone or Mac sets it on the Echo.">
+            <Switch id="forward-volume" checked={settings.forwardVolume} onCheckedChange={(on) => save({ forwardVolume: on })} />
           </Row>
         </Group>
 
