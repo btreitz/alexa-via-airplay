@@ -20,6 +20,20 @@ const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
 const SILENCE = Buffer.alloc(Math.round((BYTES_PER_SECOND * TICK_MS) / 1000 / 4) * 4);
 
 /**
+ * ffmpeg's arguments. "-probesize 32 -analyzeduration 0" matter for latency: by
+ * default ffmpeg analyses the first ~5 s of input before it encodes anything and
+ * then releases them at once. The Echo keeps such a backlog buffered for the
+ * whole session, so it would play ~5 s late. Raw PCM with a given format needs
+ * no analysis; with these options the first MP3 frame comes after ~0.1 s.
+ */
+export const ENCODER_ARGS: readonly string[] = [
+  "-hide_banner", "-loglevel", "warning", "-nostdin",
+  "-probesize", "32", "-analyzeduration", "0",
+  "-f", "s16le", "-ar", String(SAMPLE_RATE), "-ch_layout", "stereo", "-i", "pipe:0",
+  "-c:a", "libmp3lame", "-b:a", "192k", "-flush_packets", "1", "-f", "mp3", "pipe:1",
+];
+
+/**
  * The test sound: two soft bell notes (A5, E5) every 1.5 s. Easy to hear and
  * clearly not music. Its length is a whole number of ticks, so it loops cleanly.
  */
@@ -49,6 +63,8 @@ export function chime(): Buffer {
 /**
  * Reads a FIFO without blocking a libuv threadpool thread. O_RDWR keeps the
  * FIFO open while no writer is attached, so there's no EOF between sessions.
+ * Emits "pcm" (Buffer) for every chunk and "active" when audio starts flowing
+ * after a pause, so the session can react at once instead of on its next tick.
  */
 export class PcmInput extends EventEmitter {
   readonly fifo: string;
@@ -90,10 +106,12 @@ export class PcmInput extends EventEmitter {
     this.carry = usable < data.length ? data.subarray(usable) : undefined;
     data = data.subarray(0, usable);
     if (data.length === 0) return;
+    const wasActive = this.active;
     this.bytesTotal += data.length;
     this.lastDataAt = Date.now();
     this.measure(data);
     this.emit("pcm", data);
+    if (!wasActive) this.emit("active");
   }
 
   private measure(chunk: Buffer): void {
@@ -204,11 +222,7 @@ export class Mp3Broadcaster extends EventEmitter {
 
   private startEncoder(): void {
     if (this.encoder) return;
-    const encoder = spawn(FFMPEG, [
-      "-hide_banner", "-loglevel", "warning", "-nostdin",
-      "-f", "s16le", "-ar", String(SAMPLE_RATE), "-ch_layout", "stereo", "-i", "pipe:0",
-      "-c:a", "libmp3lame", "-b:a", "192k", "-flush_packets", "1", "-f", "mp3", "pipe:1",
-    ]);
+    const encoder = spawn(FFMPEG, [...ENCODER_ARGS]);
     this.encoder = encoder;
     this.log.debug("encoder started");
     encoder.stdin.on("error", () => {}); // EPIPE when ffmpeg dies; handled on exit

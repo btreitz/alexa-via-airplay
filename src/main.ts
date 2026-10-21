@@ -35,11 +35,21 @@ async function main(): Promise<void> {
     testing: (serial) => bridge.testing(serial),
   });
   bridge.sessions = sessions;
-  bridge.on("receiver-added", (receiver) => sessions.track(receiver.id));
+  bridge.on("receiver-added", (receiver) => {
+    sessions.track(receiver.id);
+    // Audio starting after a pause: the session reacts at once, not on its next tick.
+    receiver.input.on("active", () => sessions.onAudio(receiver.id));
+  });
   bridge.on("receiver-removed", (receiver) => sessions.forget(receiver.id));
   publicServer.on("stream-open", (event) => sessions.onStreamOpen(event.receiverId));
   publicServer.on("stream-close", (event) => sessions.onStreamClose(event.receiverId));
-  events.on("event", (receiver: string, event: string, payload: string) => sessions.onEvent(receiver, event, payload));
+  // A sender connecting or starting: the next Amazon command is likely starting
+  // an Echo, so have the login check and the connection ready for it.
+  const warmUpEvents = new Set(["client_ip", "active_start", "play_start"]);
+  events.on("event", (receiver: string, event: string, payload: string) => {
+    if (warmUpEvents.has(event)) bridge.alexa.keepWarm();
+    sessions.onEvent(receiver, event, payload);
+  });
   setInterval(() => sessions.tick(), 1000).unref();
 
   const ui = new UiServer(bridge, publicServer);

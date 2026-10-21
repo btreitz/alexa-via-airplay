@@ -7,6 +7,7 @@
 
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
+import https from "node:https";
 import { createRequire } from "node:module";
 import { errorMessage, logger } from "../lib/log.ts";
 import { modelName } from "./device-models.ts";
@@ -14,6 +15,15 @@ import { modelName } from "./device-models.ts";
 const require = createRequire(import.meta.url);
 const log = logger("alexa");
 const COMMAND_TIMEOUT_MS = 15_000;
+/** alexa-remote2 re-checks the login before a command once its last check is 30 min old. */
+const AUTH_REFRESH_MS = 25 * 60_000;
+const WARM_MIN_INTERVAL_MS = 30_000;
+
+// alexa-remote2 sends its requests with Node's global HTTPS agent, which keeps
+// idle connections for only 5 s. Amazon keeps them open for minutes, so keep
+// ours for 60 s: a command shortly after another (or after keepWarm) reuses
+// the TLS connection instead of opening a new one.
+https.globalAgent = new https.Agent({ keepAlive: true, timeout: 60_000 });
 
 /** The part of alexa-remote2 this module uses. */
 interface AlexaRemoteInstance extends EventEmitter {
@@ -22,6 +32,9 @@ interface AlexaRemoteInstance extends EventEmitter {
   init(options: Record<string, unknown>, callback: (err?: Error | null) => void): void;
   initDeviceState(callback: () => void): void;
   sendSequenceCommand(serial: string, command: string, value: unknown, callback: (err: Error | null, res?: unknown) => void): void;
+  checkAuthentication(callback: (authenticated: boolean | null, err?: unknown) => void): void;
+  /** When alexa-remote2 last confirmed the login; it checks again before a command after 30 min. */
+  lastAuthCheck: number | null;
   stopProxyServer(callback?: () => void): void;
   stop(): void;
 }
@@ -76,13 +89,24 @@ export function redact(message: string): string {
     .replace(/(Atna\||Atza\||x-main=|at-main=|sess-at-main=|session-id=|ubid-[a-z]+=)[^;"\s]+/gi, "$1<redacted>");
 }
 
+interface QueuedCommand {
+  command: string;
+  value: unknown;
+  /** Starting or stopping the Echo: goes ahead of waiting volume commands. */
+  first: boolean;
+  resolve: () => void;
+  reject: (reason?: unknown) => void;
+}
+
 /** Emits "state" (AlexaState) and "devices" (AlexaDevice[]). */
 export class AlexaController extends EventEmitter {
   private readonly sessionFile: string;
   private remote?: AlexaRemoteInstance;
   private current: AlexaState = { status: "logged-out" };
   private amazonPage?: string;
-  private readonly queues = new Map<string, Promise<void>>();
+  private readonly queues = new Map<string, { busy: boolean; waiting: QueuedCommand[] }>();
+  private lastWarmAt = 0;
+  private warmTimer?: NodeJS.Timeout;
 
   constructor(sessionFile: string) {
     super();
@@ -139,15 +163,31 @@ export class AlexaController extends EventEmitter {
 
   /** Says `text` to the Echo as if spoken, e.g. "open my sound bridge". */
   textCommand(serial: string, text: string): Promise<void> {
-    return this.sequence(serial, "textCommand", text);
+    return this.sequence(serial, "textCommand", text, true);
   }
 
   setVolume(serial: string, volume: number): Promise<void> {
-    return this.sequence(serial, "volume", Math.max(0, Math.min(100, Math.round(volume))));
+    return this.sequence(serial, "volume", Math.max(0, Math.min(100, Math.round(volume))), false);
   }
 
   stopPlayback(serial: string): Promise<void> {
-    return this.sequence(serial, "deviceStop", null);
+    return this.sequence(serial, "deviceStop", null, true);
+  }
+
+  /**
+   * Refreshes alexa-remote2's login check, which it otherwise runs before a
+   * command once the last one is 30 min old (an extra round trip), and opens
+   * the TLS connection. Then the next command, typically starting an Echo,
+   * goes out at once. Called when a sender connects and every 25 min.
+   */
+  keepWarm(): void {
+    const remote = this.remote;
+    if (!remote || !this.ready || Date.now() - this.lastWarmAt < WARM_MIN_INTERVAL_MS) return;
+    this.lastWarmAt = Date.now();
+    remote.checkAuthentication((authenticated, err) => {
+      if (authenticated) remote.lastAuthCheck = Date.now();
+      else log.debug("login check failed", { error: err ? redact(errorMessage(err)) : undefined });
+    });
   }
 
   shutdown(): void {
@@ -157,16 +197,41 @@ export class AlexaController extends EventEmitter {
   /**
    * Commands to one Echo run one after another: Amazon tends to leave a
    * command unanswered when another one for the same device is in flight.
+   * Starting and stopping the Echo go ahead of waiting volume commands.
    */
-  private sequence(serial: string, command: string, value: unknown): Promise<void> {
-    const previous = this.queues.get(serial) ?? Promise.resolve();
-    const run = previous.catch(() => {}).then(() => this.sendNow(serial, command, value));
-    const tail = run.catch(() => {});
-    this.queues.set(serial, tail);
-    void tail.then(() => {
-      if (this.queues.get(serial) === tail) this.queues.delete(serial);
+  private sequence(serial: string, command: string, value: unknown, first: boolean): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let queue = this.queues.get(serial);
+      if (!queue) {
+        queue = { busy: false, waiting: [] };
+        this.queues.set(serial, queue);
+      }
+      const item: QueuedCommand = { command, value, first, resolve, reject };
+      const before = first ? queue.waiting.findIndex((waiting) => !waiting.first) : -1;
+      if (before === -1) queue.waiting.push(item);
+      else queue.waiting.splice(before, 0, item);
+      this.runNext(serial, queue);
     });
-    return run;
+  }
+
+  private runNext(serial: string, queue: { busy: boolean; waiting: QueuedCommand[] }): void {
+    if (queue.busy) return;
+    const item = queue.waiting.shift();
+    if (!item) {
+      this.queues.delete(serial);
+      return;
+    }
+    queue.busy = true;
+    Promise.resolve()
+      .then(() => this.sendNow(serial, item.command, item.value))
+      .then(
+        () => item.resolve(),
+        (err) => item.reject(err),
+      )
+      .finally(() => {
+        queue.busy = false;
+        this.runNext(serial, queue);
+      });
   }
 
   private sendNow(serial: string, command: string, value: unknown): Promise<void> {
@@ -189,10 +254,14 @@ export class AlexaController extends EventEmitter {
   private setState(state: AlexaState): void {
     this.current = state;
     log.info("state", { ...state });
+    clearInterval(this.warmTimer);
+    this.warmTimer = state.status === "ready" ? setInterval(() => this.keepWarm(), AUTH_REFRESH_MS).unref() : undefined;
     this.emit("state", state);
   }
 
   private teardown(): void {
+    clearInterval(this.warmTimer);
+    this.warmTimer = undefined;
     if (!this.remote) return;
     const remote = this.remote;
     this.remote = undefined;

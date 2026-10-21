@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   airplayToPercent, DROP_GRACE_MS, MAX_TRIGGER_ATTEMPTS, parseVolumePayload, RETRIGGER_AFTER_MS,
-  SessionManager, VOLUME_AFTER_CONNECT_MS, VOLUME_DEBOUNCE_MS, type SessionTarget,
+  PLAY_REQUEST_MS, SessionManager, VOLUME_AFTER_CONNECT_MS, VOLUME_MIN_INTERVAL_MS, type SessionTarget,
 } from "../../src/bridge/session.ts";
 
 function harness(settings = { idleTimeoutSeconds: 60, forwardVolume: true }) {
@@ -163,18 +163,35 @@ test("a quick reconnect (replaced connection) isn't a stop", () => {
   assert.ok(!h.calls.some((c) => c.startsWith("remote")));
 });
 
-test("volume is debounced, sent only while connected, and resent on connect", async () => {
+test("volume: sent only while connected, resent on connect, then at once on a change", async () => {
   const h = harness();
+  const volumes = () => h.calls.filter((c) => c.startsWith("volume"));
   h.sessions.onEvent("bath", "volume", "-24.00,0.00,0.00,0.00");
-  h.advance(VOLUME_DEBOUNCE_MS + 1000);
-  assert.ok(!h.calls.some((c) => c.startsWith("volume")));
+  h.advance(2000);
+  assert.deepEqual(volumes(), []);
   h.sessions.onStreamOpen("bath");
   h.advance(VOLUME_AFTER_CONNECT_MS + 1000, { audio: true });
-  assert.deepEqual(h.calls.filter((c) => c.startsWith("volume")), ["volume SERIAL 20"]);
+  assert.deepEqual(volumes(), ["volume SERIAL 20"]);
   await new Promise((r) => setImmediate(r)); // Amazon answered
-  for (const v of ["-20.08", "-19.42", "-15.00"]) h.sessions.onEvent("bath", "volume", `${v},0,0,0`);
-  h.advance(VOLUME_DEBOUNCE_MS + 1000, { audio: true });
-  assert.deepEqual(h.calls.filter((c) => c.startsWith("volume")), ["volume SERIAL 20", "volume SERIAL 50"]);
+  h.sessions.onEvent("bath", "volume", "-15.00,0,0,0");
+  assert.deepEqual(volumes(), ["volume SERIAL 20", "volume SERIAL 50"]); // no waiting
+});
+
+test("volume: a quick series sends the first at once, then the latest after the interval", async () => {
+  const h = harness();
+  const volumes = () => h.calls.filter((c) => c.startsWith("volume"));
+  h.sessions.onStreamOpen("bath");
+  h.advance(VOLUME_AFTER_CONNECT_MS + 1000, { audio: true }); // nothing to send yet
+  h.sessions.onEvent("bath", "volume", "-24,0,0,0");
+  await new Promise((r) => setImmediate(r));
+  for (const v of ["-21", "-18", "-15"]) h.sessions.onEvent("bath", "volume", `${v},0,0,0`);
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(volumes(), ["volume SERIAL 20"]); // the rest waits for the interval
+  h.advance(VOLUME_MIN_INTERVAL_MS, { audio: true });
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(volumes(), ["volume SERIAL 20", "volume SERIAL 50"]); // 30 and 40 skipped
+  h.advance(5000, { audio: true });
+  assert.equal(volumes().length, 2);
 });
 
 test("volume forwarding can be switched off", () => {
@@ -197,9 +214,9 @@ test("only one volume command in flight; the latest value follows", async () => 
   h.sessions.onEvent("bath", "volume", "-15,0,0,0");
   h.advance(VOLUME_AFTER_CONNECT_MS + 1000, { audio: true });
   h.sessions.onEvent("bath", "volume", "-9,0,0,0");
-  h.advance(VOLUME_DEBOUNCE_MS + 1000, { audio: true });
+  h.advance(VOLUME_MIN_INTERVAL_MS + 1000, { audio: true });
   h.sessions.onEvent("bath", "volume", "-3,0,0,0");
-  h.advance(VOLUME_DEBOUNCE_MS + 1000, { audio: true });
+  h.advance(VOLUME_MIN_INTERVAL_MS + 1000, { audio: true });
   assert.deepEqual(sent, [50]); // still waiting for Amazon
   release();
   await new Promise((r) => setImmediate(r));
@@ -216,4 +233,49 @@ test("speaker test: no idle stop and no AirPlay volume while it runs", () => {
   h.setTesting(false);
   h.advance(2000);
   assert.ok(h.calls.includes("stop SERIAL"));
+});
+
+test("play pressed on the sender starts the Echo before audio arrives", () => {
+  const h = harness();
+  h.sessions.onEvent("bath", "ssnc/pres", "");
+  assert.deepEqual(h.calls, ["trigger SERIAL"]); // at once, no tick needed
+  assert.equal(h.target.airplay, true);
+});
+
+test("play pressed but no audio: one attempt, no retries", () => {
+  const h = harness();
+  h.sessions.onEvent("bath", "ssnc/pres", "");
+  h.advance(PLAY_REQUEST_MS + RETRIGGER_AFTER_MS * 2);
+  assert.deepEqual(h.calls, ["trigger SERIAL"]);
+});
+
+test("pause right after play: the early start is withdrawn", () => {
+  const h = harness();
+  h.setCanControl(false); // e.g. Amazon reconnecting while play is pressed
+  h.sessions.onEvent("bath", "ssnc/pres", "");
+  h.sessions.onEvent("bath", "ssnc/paus", "");
+  h.setCanControl(true);
+  h.advance(5000);
+  assert.deepEqual(h.calls, []);
+});
+
+test("audio starting triggers at once, not on the next tick", () => {
+  const h = harness();
+  h.target.lastAudioAt = h.now;
+  h.sessions.onAudio("bath");
+  assert.deepEqual(h.calls, ["trigger SERIAL"]);
+});
+
+test("play pressed after the user stopped the Echo starts it again", () => {
+  const h = harness();
+  h.sessions.onEvent("bath", "active_start", "--");
+  h.advance(2000, { audio: true });
+  h.sessions.onStreamOpen("bath");
+  h.sessions.onStreamClose("bath"); // "Alexa, stop" while audio plays
+  h.advance(DROP_GRACE_MS + 1000, { audio: true });
+  assert.ok(h.calls.includes("remote bath pause"));
+  assert.equal(h.sessions.snapshot("bath").suppressed, true);
+  h.advance(RETRIGGER_AFTER_MS + 1000); // the sender paused, no audio
+  h.sessions.onEvent("bath", "ssnc/pres", "");
+  assert.equal(h.calls.filter((c) => c.startsWith("trigger")).length, 2);
 });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { chime, SAMPLE_RATE } from "../../src/airplay/audio.ts";
+import { chime, ENCODER_ARGS, SAMPLE_RATE } from "../../src/airplay/audio.ts";
 
 test("the test chime is audible, not clipped, and loops in whole 20 ms ticks", () => {
   const sound = chime();
@@ -13,4 +13,13 @@ test("the test chime is audible, not clipped, and loops in whole 20 ms ticks", (
   // It starts and ends near silence, so the loop doesn't click.
   assert.ok(Math.abs(sound.readInt16LE(0)) < 1000);
   assert.ok(Math.abs(sound.readInt16LE(sound.length - 4)) < 1000);
+});
+
+test("the encoder starts without analysing its input (otherwise ~5 s of delay)", () => {
+  const input = ENCODER_ARGS.indexOf("-i");
+  for (const [option, value] of [["-probesize", "32"], ["-analyzeduration", "0"]]) {
+    const at = ENCODER_ARGS.indexOf(option);
+    assert.ok(at !== -1 && at < input, `${option} must be an input option`);
+    assert.equal(ENCODER_ARGS[at + 1], value);
+  }
 });

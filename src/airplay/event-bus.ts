@@ -16,11 +16,19 @@ export function topicFor(receiverId: string): string {
   return `${TOPIC_PREFIX}/${receiverId}`;
 }
 
-/** avb/<id>/<event> → [id, event]; anything else → null. */
+const RAW_CODE = /^[A-Za-z0-9]{4}$/;
+
+/**
+ * avb/<id>/<event> → [id, event]. Raw metadata (publish_raw) arrives as
+ * avb/<id>/<type>/<code> with four-character codes, e.g. avb/bath/ssnc/pres →
+ * [id, "ssnc/pres"]. Anything else → null.
+ */
 export function parseTopic(topic: string): [string, string] | null {
   const parts = topic.split("/");
-  if (parts.length !== 3 || parts[0] !== TOPIC_PREFIX || !parts[1] || !parts[2]) return null;
-  return [parts[1], parts[2]];
+  if (parts[0] !== TOPIC_PREFIX || !parts[1]) return null;
+  if (parts.length === 3 && parts[2]) return [parts[1], parts[2]];
+  if (parts.length === 4 && RAW_CODE.test(parts[2]) && RAW_CODE.test(parts[3])) return [parts[1], `${parts[2]}/${parts[3]}`];
+  return null;
 }
 
 /** Commands Shairport Sync's MQTT remote accepts. */

@@ -22,7 +22,9 @@ test("shairport config escapes the name and sets per-instance values", () => {
   assert.match(conf, /output_backend = "pipe";/);
   assert.match(conf, /ignore_volume_control = "yes";/);
   assert.doesNotMatch(conf, /mqtt/);
-  assert.match(shairportConfig({ entry, fifo: "/p", mqtt: { port: 1883, topic: "t/x" } }), /enable_remote = "yes";/);
+  const withMqtt = shairportConfig({ entry, fifo: "/p", mqtt: { port: 1883, topic: "t/x" } });
+  assert.match(withMqtt, /enable_remote = "yes";/);
+  assert.match(withMqtt, /publish_raw = "yes";/); // for "pres", the play-pressed signal
 });
 
 test("ports and names", () => {

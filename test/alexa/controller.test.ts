@@ -17,7 +17,7 @@ test("redact strips tokens and cookies", () => {
   assert.doesNotMatch(out, /secret|123|abc|999|tok\b/);
 });
 
-test("commands to one Echo are serialized", async () => {
+test("commands to one Echo are serialized; stopping goes ahead of waiting volume commands", async () => {
   const { AlexaController } = await import("../../src/alexa/controller.ts");
   const c = new AlexaController("/nonexistent/session.json");
   const order: string[] = [];
@@ -35,6 +35,53 @@ test("commands to one Echo are serialized", async () => {
     },
   };
   const results = await Promise.allSettled([c.setVolume("A", 10), c.setVolume("A", 20), c.stopPlayback("A")]);
-  assert.deepEqual(order, ["volume:10", "volume:20", "deviceStop:null"]);
+  assert.deepEqual(order, ["volume:10", "deviceStop:null", "volume:20"]);
   assert.deepEqual(results.map((r) => r.status), ["fulfilled", "rejected", "fulfilled"]);
+});
+
+test("starting the Echo goes ahead of waiting volume commands, in order among its kind", async () => {
+  const { AlexaController } = await import("../../src/alexa/controller.ts");
+  const c = new AlexaController("/nonexistent/session.json");
+  const order: string[] = [];
+  (c as any).current = { status: "ready" };
+  (c as any).remote = {
+    sendSequenceCommand(_serial: string, command: string, value: unknown, cb: (err: Error | null) => void) {
+      order.push(`${command}:${value}`);
+      setTimeout(() => cb(null), 2);
+    },
+  };
+  await Promise.all([
+    c.setVolume("A", 10), // in flight right away
+    c.setVolume("A", 20),
+    c.setVolume("A", 30),
+    c.textCommand("A", "open my sound bridge"),
+    c.stopPlayback("A"),
+    c.setVolume("B", 40), // another Echo: its own queue
+  ]);
+  assert.deepEqual(
+    order.filter((o) => !o.endsWith(":40")),
+    ["volume:10", "textCommand:open my sound bridge", "deviceStop:null", "volume:20", "volume:30"],
+  );
+  assert.ok(order.includes("volume:40"));
+});
+
+test("keepWarm refreshes the login check, at most every 30 s and only when signed in", async () => {
+  const { AlexaController } = await import("../../src/alexa/controller.ts");
+  const c = new AlexaController("/nonexistent/session.json");
+  let checks = 0;
+  const remote = {
+    lastAuthCheck: null as number | null,
+    checkAuthentication(cb: (authenticated: boolean | null) => void) {
+      checks++;
+      cb(true);
+    },
+  };
+  (c as any).remote = remote;
+  c.keepWarm(); // not signed in yet
+  assert.equal(checks, 0);
+  (c as any).current = { status: "ready" };
+  c.keepWarm();
+  c.keepWarm();
+  assert.equal(checks, 1);
+  assert.ok(remote.lastAuthCheck !== null && Date.now() - remote.lastAuthCheck < 1000);
 });

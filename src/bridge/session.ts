@@ -4,6 +4,11 @@
 //
 // Inputs: Shairport Sync's events (event-bus.ts), audio activity on the PCM
 // pipe, and the Echo's stream connections (public-server.ts).
+//
+// Starting the Echo takes a few seconds (Amazon, skill, Echo connects), so it
+// starts as early as is certain: when the sender sets the play rate ("pres",
+// play pressed), or when audio starts flowing; not when a speaker is merely
+// selected.
 
 import { errorMessage, logger } from "../lib/log.ts";
 import type { RemoteCommand } from "../airplay/event-bus.ts";
@@ -22,9 +27,21 @@ export const MAX_TRIGGER_ATTEMPTS = 3;
  * doesn't report a skill's audio state, so there is no faster one.
  */
 export const DROP_GRACE_MS = 3000;
-export const VOLUME_DEBOUNCE_MS = 700;
+/**
+ * A volume change is sent at once; while commands follow each other (a slider
+ * being dragged), at most one starts per this interval, with the latest value.
+ * More would risk Amazon's throttling, which alexa-remote2 answers with a
+ * 10–80 s pause.
+ */
+export const VOLUME_MIN_INTERVAL_MS = 400;
 /** Give a freshly connected Echo a moment before changing its volume. */
 export const VOLUME_AFTER_CONNECT_MS = 1500;
+/**
+ * After the sender pressed play, start the Echo even before audio arrives, for
+ * this long. Audio normally follows within about a second; without it, the
+ * idle timeout stops the Echo again.
+ */
+export const PLAY_REQUEST_MS = 10_000;
 
 /** AirPlay volume (-30…0 dB, -144 = mute) → Echo volume 0–100. */
 export function airplayToPercent(airplayVolume: number): number {
@@ -70,8 +87,11 @@ export interface ReceiverSession {
   /** Set after the user stopped the Echo; cleared when the sender plays again. */
   suppressed: boolean;
   stoppingByUs: boolean;
+  /** When the sender last set the play rate (play pressed); 0 after a pause. */
+  playRequestedAt: number;
   volume: number | null;
   sentVolume: number | null;
+  volumeSentAt: number;
   volumeInFlight: boolean;
   lastError: string | null;
   volumeTimer?: { cancel(): void };
@@ -98,7 +118,10 @@ export class SessionManager {
   session(id: string): ReceiverSession {
     let s = this.sessions.get(id);
     if (!s) {
-      s = { active: false, connections: 0, connectedAt: 0, triggerAttempts: 0, lastTriggerAt: 0, suppressed: false, stoppingByUs: false, volume: null, sentVolume: null, volumeInFlight: false, lastError: null };
+      s = {
+        active: false, connections: 0, connectedAt: 0, triggerAttempts: 0, lastTriggerAt: 0, suppressed: false, stoppingByUs: false,
+        playRequestedAt: 0, volume: null, sentVolume: null, volumeSentAt: 0, volumeInFlight: false, lastError: null,
+      };
       this.sessions.set(id, s);
     }
     return s;
@@ -137,6 +160,9 @@ export class SessionManager {
         target.setAirplaySession(false);
         if (s.connections > 0) this.stopEcho(target, s, "AirPlay sender left");
         break;
+      case "ssnc/pres": // raw metadata: the sender set the play rate, so playback starts or resumes
+        s.playRequestedAt = this.now();
+      // falls through: like play_start, it's the user pressing play
       case "play_start":
       case "play_resume":
         // The user pressed play: start the Echo again even after a manual stop.
@@ -146,11 +172,14 @@ export class SessionManager {
         s.suppressed = false;
         s.triggerAttempts = 0;
         break;
+      case "ssnc/paus": // raw metadata: the sender paused before audio arrived; don't start the Echo for it
+        s.playRequestedAt = 0;
+        break;
       case "volume": {
         const airplay = parseVolumePayload(payload);
         if (airplay === null) break;
         s.volume = airplayToPercent(airplay);
-        this.queueVolume(target, s, VOLUME_DEBOUNCE_MS);
+        this.requestVolume(target, s);
         break;
       }
       default:
@@ -171,7 +200,18 @@ export class SessionManager {
     s.stoppingByUs = false;
     s.lastError = null;
     s.sentVolume = null; // the Echo may have its own volume now; send ours again
-    this.queueVolume(target, s, VOLUME_AFTER_CONNECT_MS);
+    if (this.deps.settings().forwardVolume) {
+      s.volumeTimer?.cancel();
+      s.volumeTimer = this.schedule(() => {
+        s.volumeTimer = undefined;
+        this.sendVolume(target, s);
+      }, VOLUME_AFTER_CONNECT_MS);
+    }
+  }
+
+  /** Audio started flowing on the receiver's pipe after a pause: react now, not on the next tick. */
+  onAudio(id: string): void {
+    this.evaluate(id);
   }
 
   onStreamClose(id: string): void {
@@ -225,13 +265,19 @@ export class SessionManager {
       return;
     }
 
+    // Play was pressed: audio is on its way, so start the Echo already. Retries
+    // (RETRIGGER_AFTER_MS later) only happen once audio actually flows.
+    const playRequested = s.playRequestedAt > 0 && now - s.playRequestedAt <= PLAY_REQUEST_MS;
     // While a dropped Echo may still reconnect, don't start it again either.
-    if (!flowing || s.suppressed || s.dropTimer || !this.deps.canControl()) return;
+    if (!(flowing || playRequested) || s.suppressed || s.dropTimer || !this.deps.canControl()) return;
     if (s.triggerAttempts >= MAX_TRIGGER_ATTEMPTS) return;
     if (s.triggerAttempts > 0 && now - s.lastTriggerAt < RETRIGGER_AFTER_MS) return;
     s.triggerAttempts++;
     s.lastTriggerAt = now;
-    log.info("AirPlay audio without Echo, starting it", { receiver: id, attempt: s.triggerAttempts });
+    log.info(flowing ? "AirPlay audio without Echo, starting it" : "play pressed on the sender, starting the Echo", {
+      receiver: id,
+      attempt: s.triggerAttempts,
+    });
     this.deps.trigger(target.serial).then(
       () => {},
       (err) => {
@@ -260,27 +306,38 @@ export class SessionManager {
     });
   }
 
-  private queueVolume(target: SessionTarget, s: ReceiverSession, delayMs: number): void {
+  /**
+   * Sends the volume now, or as soon as VOLUME_MIN_INTERVAL_MS since the last
+   * command allows. While a command is in flight or one is scheduled, that one
+   * takes care of the latest value.
+   */
+  private requestVolume(target: SessionTarget, s: ReceiverSession): void {
     if (!this.deps.settings().forwardVolume) return;
-    s.volumeTimer?.cancel();
+    if (s.volumeTimer || s.volumeInFlight) return;
+    const wait = s.volumeSentAt + VOLUME_MIN_INTERVAL_MS - this.now();
+    if (wait <= 0) {
+      this.sendVolume(target, s);
+      return;
+    }
     s.volumeTimer = this.schedule(() => {
       s.volumeTimer = undefined;
       this.sendVolume(target, s);
-    }, delayMs);
+    }, wait);
   }
 
-  /** At most one volume command in flight; afterwards the latest value is sent. */
+  /** At most one volume command in flight; afterwards the latest value follows. */
   private sendVolume(target: SessionTarget, s: ReceiverSession): void {
     if (s.volumeInFlight || s.volume === null || s.connections === 0 || s.volume === s.sentVolume) return;
     if (this.deps.testing?.(target.serial)) return;
     const volume = s.volume;
     s.sentVolume = volume;
+    s.volumeSentAt = this.now();
     s.volumeInFlight = true;
     log.info("volume", { receiver: target.id, volume });
     this.deps.setVolume(target.serial, volume).then(
       () => {
         s.volumeInFlight = false;
-        this.sendVolume(target, s);
+        this.requestVolume(target, s);
       },
       (err) => {
         s.volumeInFlight = false;

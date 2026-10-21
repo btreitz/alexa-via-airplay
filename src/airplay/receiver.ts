@@ -67,7 +67,9 @@ export function shairportConfig({ entry, fifo, mqtt }: ShairportConfigOptions): 
       `  port = ${mqtt.port};`,
       `  topic = ${quote(mqtt.topic)};`,
       '  publish_parsed = "yes";',
-      '  publish_raw = "no";',
+      // Raw metadata carries "pres" (play rate set, i.e. play pressed), the
+      // earliest certain sign that audio is coming; the parsed events don't.
+      '  publish_raw = "yes";',
       '  publish_cover = "no";',
       '  enable_remote = "yes";',
       "};",
