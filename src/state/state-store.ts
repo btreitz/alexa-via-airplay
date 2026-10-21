@@ -53,9 +53,12 @@ export class StateStore extends EventEmitter {
     try {
       return JSON.parse(text);
     } catch (err) {
-      throw new Error(`${this.file} is not valid JSON (${(err as Error).message}). Fix or delete it.`, {
-        cause: err,
-      });
+      throw new Error(
+        `${this.file} is not valid JSON (${(err as Error).message}). Fix or delete it.`,
+        {
+          cause: err,
+        },
+      );
     }
   }
 

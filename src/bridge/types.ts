@@ -1,8 +1,7 @@
 import type { RemoteCommand } from "../airplay/types.ts";
 
 export type Resolution =
-  | { serial: string; learned: boolean }
-  | { serial: null; reason: "unknown" | "ambiguous" };
+  { serial: string; learned: boolean } | { serial: null; reason: "unknown" | "ambiguous" };
 
 export interface MqttSettings {
   port: number;

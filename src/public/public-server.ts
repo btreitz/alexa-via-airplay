@@ -15,12 +15,7 @@ import { ReportHandler } from "./report-handler.ts";
 import { RequestLog } from "./request-log.ts";
 import { sendNotFound } from "./responses.ts";
 import { StreamHandler } from "./stream-handler.ts";
-import type {
-  PublicServerDeps,
-  Rejection,
-  RequestContext,
-  RequestRecord,
-} from "./types.ts";
+import type { PublicServerDeps, Rejection, RequestContext, RequestRecord } from "./types.ts";
 
 export class PublicServer extends EventEmitter {
   private readonly log = logger("public");
@@ -113,7 +108,8 @@ export class PublicServer extends EventEmitter {
       this.probes.arrived(this.remoteOf(req));
       return sendNotFound(res);
     }
-    if (onStreamPath && req.method === "POST") return this.reports.handle(this.context(req, res, url));
+    if (onStreamPath && req.method === "POST")
+      return this.reports.handle(this.context(req, res, url));
     if (!onStreamPath || (req.method !== "GET" && req.method !== "HEAD")) {
       this.requests.count("path");
       this.log.debug("rejected path", {
@@ -129,11 +125,7 @@ export class PublicServer extends EventEmitter {
     return this.deps.clientIp.resolve(req.socket.remoteAddress, req.headers);
   }
 
-  private context(
-    req: http.IncomingMessage,
-    res: http.ServerResponse,
-    url: URL,
-  ): RequestContext {
+  private context(req: http.IncomingMessage, res: http.ServerResponse, url: URL): RequestContext {
     return { req, res, url, remote: this.remoteOf(req), query: redactQuery(url.searchParams) };
   }
 }

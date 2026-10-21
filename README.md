@@ -47,14 +47,14 @@ limits, is in **[SETUP.md](SETUP.md)**. All options are listed in
 
 ## Ports
 
-| Port | Purpose | Exposure |
-|---|---|---|
-| 8098/tcp | Web UI and API | LAN only, never publish |
-| 8099/tcp | Public stream (`/play.mp3` only) | Through the tunnel or your HTTPS proxy |
-| 3456/tcp | Amazon login proxy, only while signing in | LAN |
-| 7000+/tcp | AirPlay, one per receiver | LAN |
-| 319, 320/udp | NQPTP (AirPlay 2 timing) | LAN |
-| 5353/udp | mDNS | LAN |
+| Port         | Purpose                                   | Exposure                               |
+| ------------ | ----------------------------------------- | -------------------------------------- |
+| 8098/tcp     | Web UI and API                            | LAN only, never publish                |
+| 8099/tcp     | Public stream (`/play.mp3` only)          | Through the tunnel or your HTTPS proxy |
+| 3456/tcp     | Amazon login proxy, only while signing in | LAN                                    |
+| 7000+/tcp    | AirPlay, one per receiver                 | LAN                                    |
+| 319, 320/udp | NQPTP (AirPlay 2 timing)                  | LAN                                    |
+| 5353/udp     | mDNS                                      | LAN                                    |
 
 The container needs `network_mode: host`.
 
@@ -93,15 +93,15 @@ the page's inline scripts instead of allowing inline scripts in general.
 
 `src/` layout:
 
-| Folder | Role |
-|---|---|
-| `main.ts`, `config.ts`, `state.ts` | Entry point, environment config, persisted settings |
-| `lib/` | Logging, child-process supervision |
-| `bridge/` | Orchestration: receiver selection, triggering Echos, device mapping, session logic (start/stop/volume) |
-| `airplay/` | Shairport Sync per Echo, PCM → MP3 broadcast, dbus/Avahi/NQPTP, receiver events over loopback MQTT, host checks |
-| `alexa/` | Amazon login and commands (alexa-remote2), generated skill code |
-| `public/` | Public stream listener and its checks (signed URLs, home IP, client IP), URL check |
-| `ui/` | LAN API, UI file serving, API types shared with `web/` |
+| Folder                             | Role                                                                                                            |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `main.ts`, `config.ts`, `state.ts` | Entry point, environment config, persisted settings                                                             |
+| `lib/`                             | Logging, child-process supervision                                                                              |
+| `bridge/`                          | Orchestration: receiver selection, triggering Echos, device mapping, session logic (start/stop/volume)          |
+| `airplay/`                         | Shairport Sync per Echo, PCM → MP3 broadcast, dbus/Avahi/NQPTP, receiver events over loopback MQTT, host checks |
+| `alexa/`                           | Amazon login and commands (alexa-remote2), generated skill code                                                 |
+| `public/`                          | Public stream listener and its checks (signed URLs, home IP, client IP), URL check                              |
+| `ui/`                              | LAN API, UI file serving, API types shared with `web/`                                                          |
 
 Tests in `test/` mirror this layout.
 

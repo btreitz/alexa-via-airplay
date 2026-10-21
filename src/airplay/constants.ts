@@ -70,7 +70,8 @@ export const DBUS_SOCKET = "/run/dbus/system_bus_socket";
 export const DBUS_START_TIMEOUT_MS = 5000;
 export const AVAHI_PID_FILE = "/run/avahi-daemon/pid";
 export const AVAHI_READY_TIMEOUT_MS = 10_000;
-export const AVAHI_LOG_FILTER = /startup complete|another|error|fail|warn|Joining|allow-interfaces/i;
+export const AVAHI_LOG_FILTER =
+  /startup complete|another|error|fail|warn|Joining|allow-interfaces/i;
 export const NQPTP_BIND_ERROR = /bind|address already in use/i;
 
 export const SHAIRPORT_NQPTP_NAME_MAX = 63;

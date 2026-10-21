@@ -1,25 +1,31 @@
 "use client";
 
-// Polls the bridge's status and shares it with every card.
-
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import { api, type DeviceView, type StatusResponse } from "@/lib/api";
-
-const POLL_MS = 2000;
-const DEVICES_EVERY_MS = 10_000;
+import { DEVICES_EVERY_MS, POLL_MS } from "@/lib/constants";
 
 interface BridgeContextValue {
   status: StatusResponse | null;
   devices: DeviceView[];
-  /** True when the last status request failed. */
   offline: boolean;
   refresh: () => Promise<void>;
-  /** Runs an API action: shows errors as toasts, refreshes the status afterwards. */
   run: <T>(action: () => Promise<T>, success?: string) => Promise<T | undefined>;
 }
 
 const BridgeContext = createContext<BridgeContextValue | null>(null);
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 export function BridgeProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<StatusResponse | null>(null);
@@ -27,23 +33,24 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
   const [offline, setOffline] = useState(false);
   const lastDevices = useRef({ at: 0, alexa: "" });
 
+  const refreshDevices = useCallback((alexa: string) => {
+    const due = Date.now() - lastDevices.current.at > DEVICES_EVERY_MS;
+    if (alexa === lastDevices.current.alexa && !due) return;
+    lastDevices.current = { at: Date.now(), alexa };
+    if (alexa !== "ready") setDevices([]);
+    else api.devices().then(setDevices, () => {});
+  }, []);
+
   const refresh = useCallback(async () => {
-    let next: StatusResponse;
     try {
-      next = await api.status();
+      const next = await api.status();
       setStatus(next);
       setOffline(false);
+      refreshDevices(next.alexa.status);
     } catch {
       setOffline(true);
-      return;
     }
-    const alexa = next.alexa.status;
-    if (alexa !== lastDevices.current.alexa || Date.now() - lastDevices.current.at > DEVICES_EVERY_MS) {
-      lastDevices.current = { at: Date.now(), alexa };
-      if (alexa !== "ready") setDevices([]);
-      else api.devices().then(setDevices, () => {});
-    }
-  }, []);
+  }, [refreshDevices]);
 
   const run = useCallback(
     async <T,>(action: () => Promise<T>, success?: string): Promise<T | undefined> => {
@@ -52,10 +59,10 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
         if (success) toast.success(success);
         return result;
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : String(err));
+        toast.error(errorText(err));
         return undefined;
       } finally {
-        lastDevices.current.at = 0; // device selection may have changed
+        lastDevices.current.at = 0;
         await refresh();
       }
     },
@@ -63,14 +70,17 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    // Polling subscription: refresh() sets state only after its fetch resolves.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
     const timer = setInterval(() => void refresh(), POLL_MS);
     return () => clearInterval(timer);
   }, [refresh]);
 
-  return <BridgeContext.Provider value={{ status, devices, offline, refresh, run }}>{children}</BridgeContext.Provider>;
+  return (
+    <BridgeContext.Provider value={{ status, devices, offline, refresh, run }}>
+      {children}
+    </BridgeContext.Provider>
+  );
 }
 
 export function useBridge(): BridgeContextValue {

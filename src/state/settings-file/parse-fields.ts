@@ -57,7 +57,8 @@ export function parseAmazonPage(raw: RawState, state: State, problems: ProblemLi
 
 export function parsePlayback(raw: RawState, state: State, problems: ProblemList): void {
   if (raw.idleTimeoutSeconds !== undefined) {
-    if (isValidIdleTimeout(raw.idleTimeoutSeconds)) state.idleTimeoutSeconds = raw.idleTimeoutSeconds;
+    if (isValidIdleTimeout(raw.idleTimeoutSeconds))
+      state.idleTimeoutSeconds = raw.idleTimeoutSeconds;
     else problems.add("idleTimeoutSeconds must be a whole number of seconds from 10 to 3600");
   }
   for (const key of ["forwardVolume", "restrictToHomeIp"] as const) {

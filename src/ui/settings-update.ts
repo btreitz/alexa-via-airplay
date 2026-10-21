@@ -35,7 +35,8 @@ function presetChanges(body: Body, current: State): Change[] {
   if (body.preset !== undefined) changes.push((s) => applyPreset(s, preset));
   if (body.idleTimeoutSeconds !== undefined) {
     const value = Number(body.idleTimeoutSeconds);
-    if (!isValidIdleTimeout(value)) throw new HttpError(400, "Idle timeout must be 10–3600 seconds");
+    if (!isValidIdleTimeout(value))
+      throw new HttpError(400, "Idle timeout must be 10–3600 seconds");
     changes.push((s) => (s.idleTimeoutSeconds = value));
   }
   if (body.catchUp !== undefined) {

@@ -1,12 +1,8 @@
-# alexa-via-airplay: AirPlay 2 receivers for Amazon Echo speakers.
-#
-# Shairport Sync 5.6 and NQPTP 1.2.9 come pinned together in the upstream
-# image; the digest keeps them from changing underneath us. Update both pins
-# deliberately and test multi-instance AirPlay 2 again when doing so.
+# Shairport Sync 5.6 and NQPTP 1.2.9 are pinned together by digest: update both
+# deliberately and test multi-instance AirPlay 2 again.
 ARG SHAIRPORT_IMAGE=mikebrady/shairport-sync:5.6@sha256:ff6235d83fa10c78600f4c7c803f33825bd050df3e7c3c60cc94b3572569d6d6
 ARG NODE_BUILD_IMAGE=node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
 
-# --- Build: web UI (Next.js static export) and the bridge's production dependencies
 FROM ${NODE_BUILD_IMAGE} AS build
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable
@@ -16,22 +12,18 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY web/package.json web/
 RUN pnpm install --frozen-lockfile
 
-# The UI type-checks against the bridge's API types in src/.
 COPY src src
 COPY web web
 RUN pnpm --filter @alexa-via-airplay/web build
 
-# Only the bridge's runtime dependencies, without the web workspace.
 RUN mkdir /prod && cp package.json pnpm-lock.yaml pnpm-workspace.yaml /prod/ \
  && mkdir /prod/web && cp web/package.json /prod/web/ \
  && cd /prod && pnpm install --prod --frozen-lockfile --filter alexa-via-airplay
 
-# --- Runtime
 FROM ${SHAIRPORT_IMAGE}
 
-# The base image ships a minimal FFmpeg build in /usr/local/lib for Shairport
-# Sync, which musl's loader prefers. Alpine's ffmpeg needs its own libraries,
-# so it runs through a wrapper; Shairport Sync keeps using its build.
+# musl prefers the base image's minimal FFmpeg in /usr/local/lib; Alpine's
+# ffmpeg needs its own libraries, hence the wrapper.
 RUN apk add --no-cache nodejs ffmpeg tini \
  && printf '#!/bin/sh\nLD_LIBRARY_PATH=/usr/lib exec /usr/bin/ffmpeg "$@"\n' > /usr/local/bin/ffmpeg-mp3 \
  && chmod +x /usr/local/bin/ffmpeg-mp3 \

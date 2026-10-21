@@ -70,13 +70,7 @@ export interface ReceiverOptions {
 }
 
 export type RemoteCommand =
-  | "pause"
-  | "play"
-  | "playpause"
-  | "stop"
-  | "playresume"
-  | "nextitem"
-  | "previtem";
+  "pause" | "play" | "playpause" | "stop" | "playresume" | "nextitem" | "previtem";
 
 export interface Check {
   name: string;

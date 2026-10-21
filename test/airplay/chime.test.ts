@@ -17,7 +17,10 @@ test("the test chime is audible, not clipped, and loops in whole 20 ms ticks", (
 
 test("the encoder starts without analysing its input (otherwise ~5 s of delay)", () => {
   const input = ENCODER_ARGS.indexOf("-i");
-  for (const [option, value] of [["-probesize", "32"], ["-analyzeduration", "0"]]) {
+  for (const [option, value] of [
+    ["-probesize", "32"],
+    ["-analyzeduration", "0"],
+  ]) {
     const at = ENCODER_ARGS.indexOf(option);
     assert.ok(at !== -1 && at < input, `${option} must be an input option`);
     assert.equal(ENCODER_ARGS[at + 1], value);

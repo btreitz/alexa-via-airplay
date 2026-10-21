@@ -41,13 +41,7 @@ test("starting the Echo goes ahead of waiting volume commands, in order among it
   ]);
   assert.deepEqual(
     order.filter((o) => !o.endsWith(":40")),
-    [
-      "volume:10",
-      "textCommand:open my sound bridge",
-      "deviceStop:null",
-      "volume:20",
-      "volume:30",
-    ],
+    ["volume:10", "textCommand:open my sound bridge", "deviceStop:null", "volume:20", "volume:30"],
   );
   assert.ok(order.includes("volume:40"));
 });

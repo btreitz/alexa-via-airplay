@@ -47,8 +47,14 @@ test("links valid too far ahead are refused even when correctly signed", () => {
 
 test("missing or malformed parameters", () => {
   assert.deepEqual(verifySignature(secret, "D", null, "x", now), { ok: false, reason: "missing" });
-  assert.deepEqual(verifySignature(secret, "D", "12a", "x".repeat(43), now), { ok: false, reason: "malformed" });
-  assert.deepEqual(verifySignature(secret, "D", String(now), "short", now), { ok: false, reason: "malformed" });
+  assert.deepEqual(verifySignature(secret, "D", "12a", "x".repeat(43), now), {
+    ok: false,
+    reason: "malformed",
+  });
+  assert.deepEqual(verifySignature(secret, "D", String(now), "short", now), {
+    ok: false,
+    reason: "malformed",
+  });
 });
 
 test("logged queries never contain the signature", () => {

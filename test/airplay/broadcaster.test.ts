@@ -38,14 +38,16 @@ function listen(stream: InstanceType<typeof Mp3Broadcaster>) {
   const audio = () => {
     const all = Buffer.concat(received);
     const frames: Buffer[] = [];
-    for (let i = 0; i + 3 < all.length; i += 4) if (all.readInt16LE(i) !== 0) frames.push(all.subarray(i, i + 4));
+    for (let i = 0; i + 3 < all.length; i += 4)
+      if (all.readInt16LE(i) !== 0) frames.push(all.subarray(i, i + 4));
     return Buffer.concat(frames);
   };
   return { res, audio };
 }
 
 async function settle(audio: () => Buffer, bytes: number) {
-  for (const end = Date.now() + 3000; audio().length < bytes && Date.now() < end; ) await new Promise((r) => setTimeout(r, 20));
+  for (const end = Date.now() + 3000; audio().length < bytes && Date.now() < end;)
+    await new Promise((r) => setTimeout(r, 20));
   await new Promise((r) => setTimeout(r, 100));
 }
 const second = (s: number) => Math.round((s * BYTES_PER_SECOND) / 4) * 4;

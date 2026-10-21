@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { SkillStep } from "@/components/steps/skill-step";
-import { SKILL_PARTS, type SkillPart } from "@/lib/setup";
+import { SkillStep } from "@/components/steps/skill/skill-step";
+import { SKILL_PARTS, type SkillPart } from "@/lib/routes";
 
-// A static export needs every part known at build time.
 export const dynamicParams = false;
 
 export function generateStaticParams() {

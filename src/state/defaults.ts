@@ -1,5 +1,10 @@
 import crypto from "node:crypto";
-import { DEFAULT_INVOCATION_NAME, DEFAULT_PRESET, SIGNING_SECRET_BYTES, STATE_VERSION } from "./constants.ts";
+import {
+  DEFAULT_INVOCATION_NAME,
+  DEFAULT_PRESET,
+  SIGNING_SECRET_BYTES,
+  STATE_VERSION,
+} from "./constants.ts";
 import type { State } from "./types.ts";
 
 export function newSecret(): string {

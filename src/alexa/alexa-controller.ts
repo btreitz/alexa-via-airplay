@@ -70,7 +70,9 @@ export class AlexaController extends EventEmitter {
   }
 
   devices(): AlexaDevice[] {
-    return this.remote && this.ready ? playableDevices(Object.values(this.remote.serialNumbers)) : [];
+    return this.remote && this.ready
+      ? playableDevices(Object.values(this.remote.serialNumbers))
+      : [];
   }
 
   refreshDevices(): Promise<AlexaDevice[]> {

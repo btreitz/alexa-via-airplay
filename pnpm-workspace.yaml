@@ -1,7 +1,6 @@
 packages:
   - web
 
-# pnpm only runs dependency build scripts that are listed here.
 allowBuilds:
   sharp: false
   unrs-resolver: false

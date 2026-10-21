@@ -281,16 +281,16 @@ long follow sessions:
 docker compose logs --since 5m
 ```
 
-| Symptom | Likely cause |
-|---|---|
-| Receiver doesn't appear in AirPlay | Not host networking; another mDNS responder or AirPlay 2 receiver on the host (see the startup checks); the iPhone is on another VLAN without mDNS forwarding. |
-| Echo says it can't play / "there was a problem" | Public URL check fails; the skill code is outdated (URL or secret changed); the request was refused (Diagnostics → last requests). |
-| `home-ip-unknown` refusals | The bridge can't reach `PUBLIC_IP_TRACE_URL`; check outbound internet. |
-| `home-ip-mismatch` refusals | Echos leave through another IP; or a reverse proxy sets a header the bridge doesn't trust (`CLIENT_IP_HEADER`, `TRUSTED_PROXIES`). |
-| `device-unknown` refusals | The Echo was never started by the bridge; press **Test** once. |
-| `no-session` refusals | "Alexa, open …" was said while nothing played via AirPlay. Start AirPlay instead. |
-| Echo doesn't start by itself | Amazon session expired (sign in again); the invocation name in the UI differs from the skill's. |
-| Hostname "not found" right after creating it | Negative DNS caching; wait up to 30 minutes. |
+| Symptom                                         | Likely cause                                                                                                                                                   |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Receiver doesn't appear in AirPlay              | Not host networking; another mDNS responder or AirPlay 2 receiver on the host (see the startup checks); the iPhone is on another VLAN without mDNS forwarding. |
+| Echo says it can't play / "there was a problem" | Public URL check fails; the skill code is outdated (URL or secret changed); the request was refused (Diagnostics → last requests).                             |
+| `home-ip-unknown` refusals                      | The bridge can't reach `PUBLIC_IP_TRACE_URL`; check outbound internet.                                                                                         |
+| `home-ip-mismatch` refusals                     | Echos leave through another IP; or a reverse proxy sets a header the bridge doesn't trust (`CLIENT_IP_HEADER`, `TRUSTED_PROXIES`).                             |
+| `device-unknown` refusals                       | The Echo was never started by the bridge; press **Test** once.                                                                                                 |
+| `no-session` refusals                           | "Alexa, open …" was said while nothing played via AirPlay. Start AirPlay instead.                                                                              |
+| Echo doesn't start by itself                    | Amazon session expired (sign in again); the invocation name in the UI differs from the skill's.                                                                |
+| Hostname "not found" right after creating it    | Negative DNS caching; wait up to 30 minutes.                                                                                                                   |
 
 ## 10. Limits
 

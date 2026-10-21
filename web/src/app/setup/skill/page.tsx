@@ -1,10 +1,8 @@
 "use client";
 
-// /setup/skill has no view of its own: it starts at the first part.
-
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { HREF } from "@/lib/setup";
+import { HREF } from "@/lib/routes";
 
 export default function Page() {
   const router = useRouter();

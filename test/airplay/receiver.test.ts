@@ -8,7 +8,12 @@ import {
   validateReceiverName,
 } from "../../src/bridge/receiver-names.ts";
 
-const entry = { serial: "G0922J0624471P3C", name: 'Bath "room"', port: 7001, airplayDeviceId: airplayDeviceIdFor("G0922J0624471P3C") };
+const entry = {
+  serial: "G0922J0624471P3C",
+  name: 'Bath "room"',
+  port: 7001,
+  airplayDeviceId: airplayDeviceIdFor("G0922J0624471P3C"),
+};
 
 test("receiver IDs and AirPlay device IDs are stable and well-formed", () => {
   assert.equal(receiverId("G0922J0624471P3C"), "g0922j0624471p3c");

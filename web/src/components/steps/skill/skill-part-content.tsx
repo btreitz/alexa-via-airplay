@@ -1,0 +1,32 @@
+import { AudioPlayerPart } from "@/components/steps/skill/parts/audio-player-part";
+import { CodePart } from "@/components/steps/skill/parts/code-part";
+import { CreatePart } from "@/components/steps/skill/parts/create-part";
+import { InteractionModelPart } from "@/components/steps/skill/parts/interaction-model-part";
+import { TestingPart } from "@/components/steps/skill/parts/testing-part";
+import type { SkillResponse } from "@/lib/api";
+import type { SkillPart } from "@/lib/routes";
+
+export const PARTS_WITH_FILES: readonly SkillPart[] = ["interaction-model", "code"];
+
+export function SkillPartContent({
+  part,
+  skill,
+  invocationName,
+}: {
+  part: SkillPart;
+  skill: SkillResponse | null;
+  invocationName: string;
+}) {
+  switch (part) {
+    case "create":
+      return <CreatePart />;
+    case "interaction-model":
+      return <InteractionModelPart skill={skill} invocationName={invocationName} />;
+    case "audio-player":
+      return <AudioPlayerPart />;
+    case "code":
+      return <CodePart skill={skill} />;
+    case "testing":
+      return <TestingPart />;
+  }
+}

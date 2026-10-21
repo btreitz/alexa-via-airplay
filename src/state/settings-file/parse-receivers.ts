@@ -38,7 +38,8 @@ function parseReceiver(
   problems: ProblemList,
 ): ReceiverEntry | undefined {
   if (!isObject(raw)) return void problems.add(`${at} is not an object`);
-  const serial = typeof raw.serial === "string" && SERIAL_PATTERN.test(raw.serial) ? raw.serial : null;
+  const serial =
+    typeof raw.serial === "string" && SERIAL_PATTERN.test(raw.serial) ? raw.serial : null;
   if (!serial) return void problems.add(`${at}.serial is missing or malformed`);
   if (seen.serials.has(serial)) return void problems.add(`${at}: Echo ${serial} is listed twice`);
   const name = problems.attempt(`${at}.name`, () => validateReceiverName(String(raw.name ?? "")));

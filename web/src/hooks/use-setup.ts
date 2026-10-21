@@ -11,7 +11,6 @@ export interface Setup {
   steps: Step[];
 }
 
-/** The bridge's status with the setup progress; null until the first status arrived. */
 export function useSetup(): Setup | null {
   const { status, devices } = useBridge();
   const skillConfirmed = useSkillConfirmed();

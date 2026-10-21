@@ -258,7 +258,8 @@ export class SessionManager {
   private checkGaveUpLater(target: SessionTarget, s: ReceiverSession): void {
     this.schedule(() => {
       if (s.connections > 0 || s.triggerAttempts < MAX_TRIGGER_ATTEMPTS) return;
-      s.lastError ||= "The Echo didn't connect after 3 attempts. Check the skill and the public URL.";
+      s.lastError ||=
+        "The Echo didn't connect after 3 attempts. Check the skill and the public URL.";
       this.log.warn("Echo didn't connect, giving up until the sender plays again", {
         receiver: target.id,
       });

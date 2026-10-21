@@ -16,7 +16,9 @@ function sample(): State {
     preset: "custom",
     idleTimeoutSeconds: 90,
     forwardVolume: false,
-    receivers: [{ serial: "G0922J0624471P3C", name: "Bathroom", port: 7000, airplayDeviceId: "0A1B2C3D4E5F" }],
+    receivers: [
+      { serial: "G0922J0624471P3C", name: "Bathroom", port: 7000, airplayDeviceId: "0A1B2C3D4E5F" },
+    ],
     deviceMap: { AMUJQV4RH4RIXMV5: "G0922J0624471P3C" },
   };
 }
@@ -47,17 +49,31 @@ test("missing optional values get their defaults", () => {
 
 test("a preset sets its values; settings from before presets get the preset they match", () => {
   const { signingSecret } = sample();
-  const lowLatency = parseSettingsFile({ signingSecret, preset: "low-latency", idleTimeoutSeconds: 90, catchUp: "off" }).state;
-  assert.deepEqual([lowLatency.preset, lowLatency.catchUp, lowLatency.idleTimeoutSeconds], ["low-latency", "skip", 600]);
+  const lowLatency = parseSettingsFile({
+    signingSecret,
+    preset: "low-latency",
+    idleTimeoutSeconds: 90,
+    catchUp: "off",
+  }).state;
+  assert.deepEqual(
+    [lowLatency.preset, lowLatency.catchUp, lowLatency.idleTimeoutSeconds],
+    ["low-latency", "skip", 600],
+  );
   assert.equal(parseSettingsFile({ signingSecret, catchUp: "off" }).state.preset, "uninterrupted");
   assert.equal(parseSettingsFile({ signingSecret }).state.preset, "balanced");
   assert.equal(parseSettingsFile({ signingSecret, idleTimeoutSeconds: 90 }).state.preset, "custom");
-  assert.throws(() => parseSettingsFile({ signingSecret, preset: "loud" }), /preset must be one of/);
+  assert.throws(
+    () => parseSettingsFile({ signingSecret, preset: "loud" }),
+    /preset must be one of/,
+  );
 });
 
 test("other files are refused with a clear message", () => {
   assert.throws(() => parseSettingsFile([1, 2]), /expected a JSON object/);
-  assert.throws(() => parseSettingsFile({ name: "package", version: "1.0.0" }), /isn't an alexa-via-airplay settings file/);
+  assert.throws(
+    () => parseSettingsFile({ name: "package", version: "1.0.0" }),
+    /isn't an alexa-via-airplay settings file/,
+  );
   assert.throws(() => parseSettingsFile({ format: SETTINGS_FORMAT }), /no settings in it/);
 });
 
@@ -85,6 +101,9 @@ test("every problem is reported at once", () => {
 });
 
 test("a missing AirPlay device ID is derived from the serial", () => {
-  const { state } = parseSettingsFile({ signingSecret: sample().signingSecret, receivers: [{ serial: "G0922J0624471P3C", name: "Bath", port: 7000 }] });
+  const { state } = parseSettingsFile({
+    signingSecret: sample().signingSecret,
+    receivers: [{ serial: "G0922J0624471P3C", name: "Bath", port: 7000 }],
+  });
   assert.match(state.receivers[0].airplayDeviceId, /^[0-9A-F]{12}$/);
 });

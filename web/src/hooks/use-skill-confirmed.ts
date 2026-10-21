@@ -1,11 +1,8 @@
 "use client";
 
-// The bridge can't see the developer console, so the user confirms that the
-// skill is deployed. Kept in this browser only; rotating the secret clears it.
-
 import { useSyncExternalStore } from "react";
+import { SKILL_DEPLOYED_KEY } from "@/lib/constants";
 
-const KEY = "avb.skillDeployed";
 const listeners = new Set<() => void>();
 
 function subscribe(onChange: () => void) {
@@ -18,11 +15,15 @@ function subscribe(onChange: () => void) {
 }
 
 export function setSkillConfirmed(confirmed: boolean) {
-  if (confirmed) localStorage.setItem(KEY, "1");
-  else localStorage.removeItem(KEY);
+  if (confirmed) localStorage.setItem(SKILL_DEPLOYED_KEY, "1");
+  else localStorage.removeItem(SKILL_DEPLOYED_KEY);
   for (const listener of listeners) listener();
 }
 
 export function useSkillConfirmed(): boolean {
-  return useSyncExternalStore(subscribe, () => localStorage.getItem(KEY) === "1", () => false);
+  return useSyncExternalStore(
+    subscribe,
+    () => localStorage.getItem(SKILL_DEPLOYED_KEY) === "1",
+    () => false,
+  );
 }

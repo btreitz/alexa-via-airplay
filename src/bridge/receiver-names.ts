@@ -16,9 +16,7 @@ export function validateReceiverName(input: string): string {
     throw new Error("The AirPlay name must be 1–50 characters");
   }
   if (/[\p{Cc}"\\]/u.test(name)) {
-    throw new Error(
-      "The AirPlay name must not contain quotes, backslashes or control characters",
-    );
+    throw new Error("The AirPlay name must not contain quotes, backslashes or control characters");
   }
   return name;
 }

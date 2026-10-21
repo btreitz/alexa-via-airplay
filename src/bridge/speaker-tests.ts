@@ -63,8 +63,10 @@ export class SpeakerTests {
     const takenOver = this.deps.receiver(serial)?.input.active;
     this.end(serial);
     if (takenOver) return;
-    this.deps.stopEcho(serial).catch((err) =>
-      this.log.warn("stopping after the test failed", { serial, error: errorMessage(err) }),
-    );
+    this.deps
+      .stopEcho(serial)
+      .catch((err) =>
+        this.log.warn("stopping after the test failed", { serial, error: errorMessage(err) }),
+      );
   }
 }

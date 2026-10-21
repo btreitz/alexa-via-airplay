@@ -84,7 +84,9 @@ export class Receiver {
       audio: {
         active: this.input.active,
         secondsTotal: Math.round(secondsOf(this.input.bytesTotal)),
-        lastAudioSecondsAgo: this.input.lastDataAt ? secondsSince(this.input.lastDataAt, now) : null,
+        lastAudioSecondsAgo: this.input.lastDataAt
+          ? secondsSince(this.input.lastDataAt, now)
+          : null,
         levelDb: this.input.levelDb,
       },
       listeners: this.stream.clientList.map((client) => ({

@@ -45,5 +45,12 @@ test("resolves pages, clean URLs and assets", () => {
 
 test("never leaves the root", () => {
   const s = site();
-  for (const p of ["/../outside.txt", "/%2e%2e/outside.txt", "/..%2foutside.txt", "/%00", "/%E0%A4%A"]) assert.equal(s.resolve(p), null, p);
+  for (const p of [
+    "/../outside.txt",
+    "/%2e%2e/outside.txt",
+    "/..%2foutside.txt",
+    "/%00",
+    "/%E0%A4%A",
+  ])
+    assert.equal(s.resolve(p), null, p);
 });

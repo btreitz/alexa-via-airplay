@@ -14,8 +14,14 @@ test("learns the mapping from a recent trigger and keeps it", () => {
   const store = tempStore();
   const mapper = new DeviceMapper(store);
   mapper.noteTrigger("G0922J0624471P3C");
-  assert.deepEqual(mapper.resolve("AMUJQV4RH4RIXMV5"), { serial: "G0922J0624471P3C", learned: true });
-  assert.deepEqual(mapper.resolve("AMUJQV4RH4RIXMV5"), { serial: "G0922J0624471P3C", learned: false });
+  assert.deepEqual(mapper.resolve("AMUJQV4RH4RIXMV5"), {
+    serial: "G0922J0624471P3C",
+    learned: true,
+  });
+  assert.deepEqual(mapper.resolve("AMUJQV4RH4RIXMV5"), {
+    serial: "G0922J0624471P3C",
+    learned: false,
+  });
   assert.equal(store.get().deviceMap.AMUJQV4RH4RIXMV5, "G0922J0624471P3C");
   assert.deepEqual(mapper.resolve("OTHERDEVICE00001"), { serial: null, reason: "unknown" });
 });

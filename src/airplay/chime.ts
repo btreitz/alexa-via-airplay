@@ -1,4 +1,10 @@
-import { BYTES_PER_FRAME, CHIME_GAIN, CHIME_LOOP_MS, CHIME_NOTES, SAMPLE_RATE } from "./constants.ts";
+import {
+  BYTES_PER_FRAME,
+  CHIME_GAIN,
+  CHIME_LOOP_MS,
+  CHIME_NOTES,
+  SAMPLE_RATE,
+} from "./constants.ts";
 
 function bellEnvelope(dt: number): number {
   return Math.min(1, dt * 200) * Math.exp(-dt * 5);

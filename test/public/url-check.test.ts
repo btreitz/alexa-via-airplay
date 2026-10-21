@@ -18,7 +18,12 @@ const server = new PublicServer({
   recentlyTriggered: () => false,
 });
 const homeIp = (ip: string) =>
-  new HomeIpMonitor({ traceUrl: "x", refreshSeconds: 300, ipv6PrefixLength: 64, lookup: async (_u, family) => (family === 4 ? ip : Promise.reject(new Error("none"))) });
+  new HomeIpMonitor({
+    traceUrl: "x",
+    refreshSeconds: 300,
+    ipv6PrefixLength: 64,
+    lookup: async (_u, family) => (family === 4 ? ip : Promise.reject(new Error("none"))),
+  });
 let base = "";
 
 before(async () => {
@@ -49,7 +54,11 @@ test("probe arrives but the client IP doesn't look like home", async () => {
 test("something else answering is not the bridge", async () => {
   const other = new PublicServer({ ...(server as any).deps });
   await other.listen(0, "127.0.0.1");
-  const result = await checkPublicUrl(`http://127.0.0.1:${other.address!.port}`, server, homeIp("127.0.0.1"));
+  const result = await checkPublicUrl(
+    `http://127.0.0.1:${other.address!.port}`,
+    server,
+    homeIp("127.0.0.1"),
+  );
   await other.close();
   assert.equal(result.ok, false);
   assert.match(result.message, /not this bridge/);

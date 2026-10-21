@@ -21,12 +21,7 @@ export function signature(secret: string, d: string, exp: number | string): stri
   return hmac(secret, `${d}|${exp}`);
 }
 
-export function eventSignature(
-  secret: string,
-  e: string,
-  d: string,
-  exp: number | string,
-): string {
+export function eventSignature(secret: string, e: string, d: string, exp: number | string): string {
   return hmac(secret, `event|${e}|${d}|${exp}`);
 }
 

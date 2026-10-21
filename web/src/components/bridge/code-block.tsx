@@ -4,28 +4,34 @@ import { CheckIcon, CopyIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { highlight } from "sugar-high";
 import { Button } from "@/components/ui/button";
-import { copyToClipboard } from "@/lib/format";
+import { copyToClipboard } from "@/lib/clipboard";
+import { COPY_FEEDBACK_MS } from "@/lib/constants";
 
-/**
- * Code to paste somewhere else, highlighted. A secret one stays hidden until
- * asked, so it doesn't end up in screenshots; copying works without showing it.
- */
-export function CodeBlock({ label, code, lang, secret = false }: { label: string; code: string; lang: "javascript" | "json"; secret?: boolean }) {
+export function CodeBlock({
+  label,
+  code,
+  lang,
+  secret = false,
+}: {
+  label: string;
+  code: string;
+  lang: "javascript" | "json";
+  secret?: boolean;
+}) {
   const [shown, setShown] = useState(!secret);
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
-  // sugar-high escapes the code; the markup only adds token spans.
   const html = useMemo(() => (shown ? highlight(code, { lang }) : ""), [code, lang, shown]);
 
   async function copy() {
     const ok = await copyToClipboard(code);
-    if (!ok) setShown(true); // last resort: select it by hand
+    if (!ok) setShown(true);
     setState(ok ? "copied" : "failed");
-    setTimeout(() => setState("idle"), 2500);
+    setTimeout(() => setState("idle"), COPY_FEEDBACK_MS);
   }
 
   return (
     <div className="overflow-hidden rounded-lg border">
-      <div className="bg-muted/40 flex items-center justify-between gap-2 border-b px-3 py-2">
+      <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
         <span className="font-mono text-xs">{label}</span>
         <div className="flex gap-1">
           {secret && (
@@ -36,7 +42,11 @@ export function CodeBlock({ label, code, lang, secret = false }: { label: string
           )}
           <Button size="sm" variant="outline" onClick={copy}>
             {state === "copied" ? <CheckIcon /> : <CopyIcon />}
-            {state === "copied" ? "Copied" : state === "failed" ? "Copy failed: select it by hand" : "Copy"}
+            {state === "copied"
+              ? "Copied"
+              : state === "failed"
+                ? "Copy failed: select it by hand"
+                : "Copy"}
           </Button>
         </div>
       </div>
@@ -45,7 +55,9 @@ export function CodeBlock({ label, code, lang, secret = false }: { label: string
           <code dangerouslySetInnerHTML={{ __html: html }} />
         </pre>
       ) : (
-        <p className="text-muted-foreground px-3 py-6 text-center text-xs">Hidden because it contains the signing secret. Copy works without showing it.</p>
+        <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+          Hidden because it contains the signing secret. Copy works without showing it.
+        </p>
       )}
     </div>
   );

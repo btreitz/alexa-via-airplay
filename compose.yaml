@@ -1,7 +1,3 @@
-# alexa-via-airplay. Settings: copy .env.example to .env (git-ignored), or in
-# a Portainer stack, set them as the stack's environment variables (stack.env).
-#   docker compose up -d --build
-#   docker compose logs --since 5m
 name: alexa-via-airplay
 
 services:
@@ -9,19 +5,19 @@ services:
     build: .
     image: alexa-via-airplay:local
     restart: unless-stopped
-    # Required: AirPlay discovery (mDNS) and NQPTP's UDP 319/320 need the host network.
+    # AirPlay discovery (mDNS) and NQPTP's UDP 319/320 need the host network.
     network_mode: host
     cap_add:
-      - SYS_NICE # lets Shairport Sync raise its audio thread priority
+      - SYS_NICE
     volumes:
-      - data:/data # settings, Amazon session, signing secret: back up, never commit
+      - data:/data
     env_file:
       - path: .env
         required: false
-      - path: stack.env # Portainer writes the stack's environment variables here
+      - path: stack.env
         required: false
 
 volumes:
   data:
-    # Fixed, so a stack under another name keeps the same settings and sign-in.
+    # Fixed, so a Portainer stack under any name keeps the existing data.
     name: alexa-via-airplay_data

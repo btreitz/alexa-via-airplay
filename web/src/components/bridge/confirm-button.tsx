@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
-/** A button that asks before doing something with consequences. */
 export function ConfirmButton({
   title,
   description,

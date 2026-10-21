@@ -59,10 +59,15 @@ function harness(settings = { idleTimeoutSeconds: 60, forwardVolume: true }) {
     }
   };
   return {
-    sessions, target, calls, advance,
+    sessions,
+    target,
+    calls,
+    advance,
     setCanControl: (v: boolean) => (canControl = v),
     setTesting: (v: boolean) => (testing = v),
-    get now() { return now; },
+    get now() {
+      return now;
+    },
   };
 }
 
@@ -114,7 +119,10 @@ test("idle sender: the Echo is stopped after the idle timeout", () => {
   h.advance(20_000);
   assert.ok(!h.calls.includes("stop SERIAL"));
   h.advance(15_000);
-  assert.deepEqual(h.calls.filter((c) => c.startsWith("stop")), ["stop SERIAL"]);
+  assert.deepEqual(
+    h.calls.filter((c) => c.startsWith("stop")),
+    ["stop SERIAL"],
+  );
   h.sessions.onStreamClose("bath");
   h.advance(DROP_GRACE_MS + 1000);
   assert.ok(!h.calls.some((c) => c.startsWith("remote")));

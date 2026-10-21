@@ -84,7 +84,8 @@ export class UiServer {
       sendJson(res, 200, result ?? { ok: true });
     } catch (err) {
       const status = err instanceof HttpError ? err.status : 400;
-      if (status >= 500) this.log.error("request failed", { path: pathname, error: errorMessage(err) });
+      if (status >= 500)
+        this.log.error("request failed", { path: pathname, error: errorMessage(err) });
       sendJson(res, status, { error: errorMessage(err) });
     }
   }

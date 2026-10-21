@@ -1,12 +1,9 @@
-// Typed client for the bridge's LAN API. The response types come from the
-// bridge itself (src/api-types.ts), so both sides stay in sync.
-
 import type {
   AlexaState,
   DeviceView,
   ImportSummary,
-  SettingsFile,
   PublicUrlResult,
+  SettingsFile,
   SettingsUpdate,
   SkillResponse,
   StatusResponse,
@@ -36,8 +33,11 @@ export const api = {
   logout: () => request<AlexaState>("POST", "/api/alexa/logout"),
   updateSettings: (update: SettingsUpdate) => request("PUT", "/api/settings", update),
   exportSettings: () => request<SettingsFile>("GET", "/api/settings/export"),
-  /** Without `apply` the bridge only checks the file and says what it would import. */
-  importSettings: (file: unknown, apply: boolean) => request<{ summary: ImportSummary; applied: boolean }>("POST", "/api/settings/import", { file, apply }),
+  importSettings: (file: unknown, apply: boolean) =>
+    request<{ summary: ImportSummary; applied: boolean }>("POST", "/api/settings/import", {
+      file,
+      apply,
+    }),
   checkPublicUrl: () => request<PublicUrlResult>("POST", "/api/public-url/check"),
   skill: () => request<SkillResponse>("GET", "/api/skill"),
   rotateSecret: () => request("POST", "/api/secret/rotate"),
@@ -47,6 +47,7 @@ export const api = {
   trigger: (serial: string) => request<{ mapped: boolean }>("POST", `${receiver(serial)}/trigger`),
   test: (serial: string) => request<{ endsAt: number }>("POST", `${receiver(serial)}/test`),
   stop: (serial: string) => request("POST", `${receiver(serial)}/stop`),
-  setVolume: (serial: string, volume: number) => request("POST", `${receiver(serial)}/volume`, { volume }),
+  setVolume: (serial: string, volume: number) =>
+    request("POST", `${receiver(serial)}/volume`, { volume }),
   forgetMapping: (serial: string) => request("DELETE", `${receiver(serial)}/mapping`),
 };

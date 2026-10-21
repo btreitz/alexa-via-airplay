@@ -27,7 +27,11 @@ function result(
   homeIpMatch: boolean | null = null,
 ): PublicUrlResult {
   const write = ok ? log.info : log.warn;
-  write(ok ? "public URL reaches the bridge" : "public URL check failed", { url, message, clientIp });
+  write(ok ? "public URL reaches the bridge" : "public URL check failed", {
+    url,
+    message,
+    clientIp,
+  });
   return { ok, checkedAt: new Date().toISOString(), url, clientIp, homeIpMatch, message };
 }
 

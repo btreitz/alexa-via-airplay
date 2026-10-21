@@ -32,8 +32,10 @@ before(async () => {
 });
 after(() => ui.close());
 
-const put = (body: unknown, headers: Record<string, string> = { "content-type": "application/json" }) =>
-  fetch(`${base}/api/settings`, { method: "PUT", headers, body: JSON.stringify(body) });
+const put = (
+  body: unknown,
+  headers: Record<string, string> = { "content-type": "application/json" },
+) => fetch(`${base}/api/settings`, { method: "PUT", headers, body: JSON.stringify(body) });
 
 test("status and health", async () => {
   assert.equal((await fetch(`${base}/api/health`)).status, 200);
@@ -44,8 +46,19 @@ test("status and health", async () => {
 });
 
 test("non-JSON and cross-origin writes are refused", async () => {
-  assert.equal((await put({ idleTimeoutSeconds: 30 }, { "content-type": "text/plain" })).status, 415);
-  assert.equal((await put({ idleTimeoutSeconds: 30 }, { "content-type": "application/json", origin: "http://evil.example" })).status, 403);
+  assert.equal(
+    (await put({ idleTimeoutSeconds: 30 }, { "content-type": "text/plain" })).status,
+    415,
+  );
+  assert.equal(
+    (
+      await put(
+        { idleTimeoutSeconds: 30 },
+        { "content-type": "application/json", origin: "http://evil.example" },
+      )
+    ).status,
+    403,
+  );
   assert.equal(bridge.store.get().idleTimeoutSeconds, 60);
 });
 
@@ -70,7 +83,16 @@ test("settings are validated", async () => {
   assert.equal((await put({ idleTimeoutSeconds: 5 })).status, 400);
   assert.equal((await put({ publicBaseUrl: "http://plain.example.com" })).status, 400);
   assert.equal((await put({ invocationName: "alexa" })).status, 400);
-  assert.equal((await put({ publicBaseUrl: "https://airplay.example.com/", idleTimeoutSeconds: 120, restrictToHomeIp: false })).status, 200);
+  assert.equal(
+    (
+      await put({
+        publicBaseUrl: "https://airplay.example.com/",
+        idleTimeoutSeconds: 120,
+        restrictToHomeIp: false,
+      })
+    ).status,
+    200,
+  );
   const s = bridge.store.get();
   assert.equal(s.publicBaseUrl, "https://airplay.example.com");
   assert.equal(s.idleTimeoutSeconds, 120);
@@ -85,7 +107,10 @@ test("skill files need the public URL and contain the signing secret", async () 
 
 test("rotating the secret changes it", async () => {
   const before = bridge.store.get().signingSecret;
-  const res = await fetch(`${base}/api/secret/rotate`, { method: "POST", headers: { "content-type": "application/json" } });
+  const res = await fetch(`${base}/api/secret/rotate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+  });
   assert.equal(res.status, 200);
   assert.notEqual(bridge.store.get().signingSecret, before);
 });
@@ -100,12 +125,24 @@ test("static files: UI with CSP, no path traversal", async () => {
 
 test("unknown API routes and methods", async () => {
   assert.equal((await fetch(`${base}/api/nope`)).status, 404);
-  assert.equal((await fetch(`${base}/api/status`, { method: "DELETE", headers: { "content-type": "application/json" } })).status, 405);
+  assert.equal(
+    (
+      await fetch(`${base}/api/status`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+      })
+    ).status,
+    405,
+  );
 });
 
 test("request bodies must be JSON objects with the right types", async () => {
   const post = (body: string) =>
-    fetch(`${base}/api/receivers`, { method: "POST", headers: { "content-type": "application/json" }, body });
+    fetch(`${base}/api/receivers`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
   assert.equal((await post("[1,2]")).status, 400);
   assert.equal((await post('"text"')).status, 400);
   const res = await post(JSON.stringify({ serial: "X", name: 42 }));
@@ -115,11 +152,18 @@ test("request bodies must be JSON objects with the right types", async () => {
 
 test("settings export and import: dry run first, then apply", async () => {
   const post = (body: unknown) =>
-    fetch(`${base}/api/settings/import`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    fetch(`${base}/api/settings/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
   const exported = await (await fetch(`${base}/api/settings/export`)).json();
   assert.equal(exported.state.signingSecret, bridge.store.get().signingSecret);
 
-  const changed = { ...exported, state: { ...exported.state, preset: "custom", idleTimeoutSeconds: 300 } };
+  const changed = {
+    ...exported,
+    state: { ...exported.state, preset: "custom", idleTimeoutSeconds: 300 },
+  };
   const dry = await (await post({ file: changed })).json();
   assert.equal(dry.applied, false);
   assert.notEqual(bridge.store.get().idleTimeoutSeconds, 300);

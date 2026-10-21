@@ -17,6 +17,9 @@ test("detects an occupied UDP port", async () => {
 test("bridge network heuristic", () => {
   const iface = (address: string) => [{ address, family: "IPv4", internal: false } as any];
   assert.equal(hostNetworkCheck({ lo: [], eth0: iface("172.18.0.5") }).ok, false);
-  assert.equal(hostNetworkCheck({ lo: [], eth0: iface("192.168.2.248"), docker0: iface("172.17.0.1") }).ok, true);
+  assert.equal(
+    hostNetworkCheck({ lo: [], eth0: iface("192.168.2.248"), docker0: iface("172.17.0.1") }).ok,
+    true,
+  );
   assert.equal(hostNetworkCheck({ lo: [], enp3s0: iface("10.0.0.2") }).ok, true);
 });

@@ -8,6 +8,8 @@ function uiHost(): string {
 
 const port = process.env.UI_PORT || "8098";
 
-fetch(`http://${uiHost()}:${port}/api/health`, { signal: AbortSignal.timeout(HEALTHCHECK_TIMEOUT_MS) })
+fetch(`http://${uiHost()}:${port}/api/health`, {
+  signal: AbortSignal.timeout(HEALTHCHECK_TIMEOUT_MS),
+})
   .then((res) => process.exit(res.ok ? 0 : 1))
   .catch(() => process.exit(1));

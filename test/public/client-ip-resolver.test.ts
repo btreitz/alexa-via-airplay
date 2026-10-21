@@ -3,9 +3,15 @@ import { test } from "node:test";
 import { ClientIpResolver } from "../../src/public/client-ip-resolver.ts";
 
 test("forwarded header is trusted only from a trusted proxy", () => {
-  const r = new ClientIpResolver({ header: "cf-connecting-ip", trustedProxies: ["127.0.0.1", "::1"] });
+  const r = new ClientIpResolver({
+    header: "cf-connecting-ip",
+    trustedProxies: ["127.0.0.1", "::1"],
+  });
   assert.equal(r.resolve("127.0.0.1", { "cf-connecting-ip": "92.211.1.239" }), "92.211.1.239");
-  assert.equal(r.resolve("::ffff:127.0.0.1", { "cf-connecting-ip": "92.211.1.239" }), "92.211.1.239");
+  assert.equal(
+    r.resolve("::ffff:127.0.0.1", { "cf-connecting-ip": "92.211.1.239" }),
+    "92.211.1.239",
+  );
   assert.equal(r.resolve("192.168.2.77", { "cf-connecting-ip": "92.211.1.239" }), "192.168.2.77");
 });
 
@@ -17,7 +23,10 @@ test("a trusted proxy without the header fails closed", () => {
 
 test("X-Forwarded-For uses the entry the trusted proxy appended", () => {
   const r = new ClientIpResolver({ header: "x-forwarded-for", trustedProxies: ["192.168.2.0/24"] });
-  assert.equal(r.resolve("192.168.2.248", { "x-forwarded-for": "6.6.6.6, 92.211.1.239" }), "92.211.1.239");
+  assert.equal(
+    r.resolve("192.168.2.248", { "x-forwarded-for": "6.6.6.6, 92.211.1.239" }),
+    "92.211.1.239",
+  );
 });
 
 test("no header configured: socket address", () => {
