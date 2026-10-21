@@ -80,7 +80,6 @@ async function main(): Promise<void> {
   await bridge.start();
   await publicServer.listen(config.publicPort, config.publicBind);
   await ui.listen(config.uiPort, config.uiBind);
-  bridge.tunnel?.start();
 
   // Re-check the public URL only once it has worked before (see public-url-check.ts).
   const recheck = async () => {
@@ -88,7 +87,7 @@ async function main(): Promise<void> {
     if (!base || !bridge.store.get().publicUrlVerifiedAt) return;
     bridge.publicUrlCheck = await checkPublicUrl(base, publicServer, bridge.homeIp);
   };
-  setTimeout(() => void recheck(), bridge.tunnel ? 15_000 : 3000).unref();
+  setTimeout(() => void recheck(), 3000).unref();
   setInterval(() => void recheck(), 30 * 60_000).unref();
   log.info("ready", {
     ui: `http://<this host>:${config.uiPort}/`,

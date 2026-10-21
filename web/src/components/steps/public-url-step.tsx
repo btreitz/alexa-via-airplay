@@ -23,7 +23,7 @@ export function PublicUrlStep() {
   const [checking, setChecking] = useState(false);
   if (!status || !setup) return null;
   const step = setup.steps[0];
-  const { settings, publicUrlCheck: check, tunnel } = status;
+  const { settings, publicUrlCheck: check } = status;
 
   // One action: save if changed, then check, because only a checked URL counts.
   async function saveAndCheck(e: FormEvent) {
@@ -75,18 +75,11 @@ export function PublicUrlStep() {
           </Field>
         </form>
 
-        {(check || tunnel.enabled) && (
+        {check && (
           <Section title="Status">
-            {check && (
-              <StatusLine tone={!check.ok ? "bad" : check.homeIpMatch === false ? "warn" : "ok"} detail={`Checked ${ago(check.checkedAt)}`}>
-                {check.message}
-              </StatusLine>
-            )}
-            {"connections" in tunnel && (
-              <StatusLine tone={tunnel.connections > 0 ? "ok" : "bad"} detail={tunnel.lastError ?? undefined}>
-                Built-in Cloudflare tunnel: {tunnel.connections > 0 ? `connected (${tunnel.connections} connections)` : "not connected"}
-              </StatusLine>
-            )}
+            <StatusLine tone={!check.ok ? "bad" : check.homeIpMatch === false ? "warn" : "ok"} detail={`Checked ${ago(check.checkedAt)}`}>
+              {check.message}
+            </StatusLine>
           </Section>
         )}
 
@@ -101,11 +94,11 @@ export function PublicUrlStep() {
               <li>Zero Trust → Networks → Tunnels: create a tunnel, choose Docker, copy the token.</li>
               <li>Add a public hostname, e.g. airplay.example.com, with service <code className="text-foreground">http://localhost:8099</code>.</li>
               <li>
-                Put the token in <code className="text-foreground">.env</code> as <code className="text-foreground">TUNNEL_TOKEN</code> and restart
-                the container.
+                Run cloudflared with that token on this host, with host networking, e.g. as its own Docker Compose stack. The bridge doesn&apos;t
+                run it for you.
               </li>
             </ol>
-            <p>Any other HTTPS reverse proxy to port 8099 works too. Details are in SETUP.md.</p>
+            <p>Any other HTTPS reverse proxy to port 8099 works too. Details, with a compose file for cloudflared, are in SETUP.md.</p>
           </CollapsibleContent>
         </Collapsible>
       </div>

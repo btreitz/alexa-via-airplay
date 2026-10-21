@@ -241,7 +241,6 @@ export class UiServer {
         system: bridge.system?.health() ?? null,
         checks: bridge.checks,
         publicUrlCheck: bridge.publicUrlCheck,
-        tunnel: bridge.tunnel?.status() ?? { enabled: false as const },
         receivers: bridge.receiverStatuses(),
         publicRequests: this.publicServer.recent.slice(-20).reverse(),
         skillReports: {

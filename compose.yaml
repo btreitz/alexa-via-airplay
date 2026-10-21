@@ -1,4 +1,5 @@
-# alexa-via-airplay. Settings: copy .env.example to .env (git-ignored).
+# alexa-via-airplay. Settings: copy .env.example to .env (git-ignored), or in
+# a Portainer stack, set them as the stack's environment variables (stack.env).
 #   docker compose up -d --build
 #   docker compose logs --since 5m
 name: alexa-via-airplay
@@ -17,6 +18,10 @@ services:
     env_file:
       - path: .env
         required: false
+      - path: stack.env # Portainer writes the stack's environment variables here
+        required: false
 
 volumes:
   data:
+    # Fixed, so a stack under another name keeps the same settings and sign-in.
+    name: alexa-via-airplay_data

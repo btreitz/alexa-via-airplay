@@ -13,7 +13,6 @@ import { HomeIpMonitor } from "../public/home-ip.ts";
 import type { ReceiverView } from "../ui/api-types.ts";
 import type { PublicUrlResult } from "../public/url-check.ts";
 import type { SessionManager } from "./session.ts";
-import { Tunnel } from "../public/tunnel.ts";
 import { launchPhrase } from "../alexa/skill.ts";
 import type { SkillEvent } from "../public/signing.ts";
 import { StateStore, type ReceiverEntry } from "../state.ts";
@@ -66,7 +65,6 @@ export class Bridge extends EventEmitter {
   /** Results of the startup checks, shown in the UI. */
   checks: Check[] = [];
   publicUrlCheck: PublicUrlResult | null = null;
-  readonly tunnel?: Tunnel;
 
   constructor(config: Config) {
     super();
@@ -81,7 +79,6 @@ export class Bridge extends EventEmitter {
       ipv6PrefixLength: config.ipv6PrefixLength,
     });
     this.clientIp = new ClientIpResolver({ header: config.clientIpHeader, trustedProxies: config.trustedProxies });
-    if (config.tunnelToken) this.tunnel = new Tunnel(config.tunnelToken);
   }
 
   /** Host checks that must run before NQPTP and Avahi take the ports. */
@@ -113,7 +110,6 @@ export class Bridge extends EventEmitter {
 
   async stop(): Promise<void> {
     this.homeIp.stop();
-    await this.tunnel?.stop();
     this.alexa.shutdown();
     await Promise.all([...this.receivers.values()].map((r) => r.stop()));
     this.receivers.clear();

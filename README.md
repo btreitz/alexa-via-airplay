@@ -18,7 +18,7 @@ iPhone/Mac ──AirPlay 2──▶ bridge (Shairport Sync per Echo) ──MP3�
   own private Alexa skill. The skill answers with a short-lived signed URL of
   the bridge's stream, which the Echo then plays.
 - The stream must be reachable over public HTTPS (Amazon rejects LAN URLs);
-  a Cloudflare Tunnel is the easiest way and can run inside the container.
+  a Cloudflare Tunnel that you run next to the bridge is the easiest way.
   Only your own Echos can play it: signed URLs, your home's public IP, and
   active sessions only.
 - Volume follows the sender; the Echo stops when you stop AirPlay.
@@ -32,9 +32,11 @@ devices, a domain on Cloudflare (or another way to publish one port over
 HTTPS), and the Amazon account that owns the Echos.
 
 1. Create a Cloudflare Tunnel with a public hostname pointing to
-   `http://localhost:8099`, and copy its token.
-2. `cp .env.example .env`, set `TUNNEL_TOKEN`, then
-   `docker compose up -d --build`.
+   `http://localhost:8099`, and run cloudflared with its token on the same
+   host with host networking (SETUP.md has a compose file for it).
+2. `cp .env.example .env`, set `PUBLIC_BIND=127.0.0.1`, then
+   `docker compose up -d --build` (or deploy this repository as a Portainer
+   stack).
 3. Open `http://<host>:8098/` and follow the steps there: check the public
    URL, sign in to Amazon, create your Alexa skill by pasting the two
    generated files, select your Echos.
@@ -98,7 +100,7 @@ the page's inline scripts instead of allowing inline scripts in general.
 | `bridge/` | Orchestration: receiver selection, triggering Echos, device mapping, session logic (start/stop/volume) |
 | `airplay/` | Shairport Sync per Echo, PCM → MP3 broadcast, dbus/Avahi/NQPTP, receiver events over loopback MQTT, host checks |
 | `alexa/` | Amazon login and commands (alexa-remote2), generated skill code |
-| `public/` | Public stream listener and its checks (signed URLs, home IP, client IP), URL check, built-in cloudflared |
+| `public/` | Public stream listener and its checks (signed URLs, home IP, client IP), URL check |
 | `ui/` | LAN API, UI file serving, API types shared with `web/` |
 
 Tests in `test/` mirror this layout.

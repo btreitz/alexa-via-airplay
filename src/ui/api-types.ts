@@ -11,7 +11,6 @@ import type { PublicUrlResult } from "../public/url-check.ts";
 import type { ReceiverStatus } from "../airplay/receiver.ts";
 import type { SessionSnapshot } from "../bridge/session.ts";
 import type { SystemHealth } from "../airplay/system-services.ts";
-import type { TunnelStatus } from "../public/tunnel.ts";
 
 export type { AlexaDevice, AlexaState, CatchUp, Preset, Check, EchoBufferStatus, HomeIpStatus, PublicUrlResult, ReceiverStatus, RequestRecord, SessionSnapshot };
 export type { ImportSummary, SettingsFile } from "../settings-file.ts";
@@ -56,7 +55,6 @@ export interface StatusResponse {
   system: SystemHealth | null;
   checks: Check[];
   publicUrlCheck: PublicUrlResult | null;
-  tunnel: TunnelStatus | { enabled: false };
   receivers: ReceiverView[];
   publicRequests: RequestRecord[];
   /** The skill's playback reports ("Alexa, stop", the Echo's buffer). */

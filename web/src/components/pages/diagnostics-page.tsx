@@ -50,7 +50,7 @@ function Facts({ rows }: { rows: [string, string][] }) {
 export function DiagnosticsPage() {
   const { status } = useBridge();
   if (!status) return null;
-  const { publicAccess: access, publicUrlCheck: check, tunnel } = status;
+  const { publicAccess: access, publicUrlCheck: check } = status;
 
   const checks: [Tone, string][] = status.checks.map((c) => [c.ok ? "ok" : "bad", c.message]);
   if (status.system) {
@@ -66,9 +66,6 @@ export function DiagnosticsPage() {
   if (reports.lastSecondsAgo !== null) checks.push(["ok", `The skill reports playback (last ${secondsAgo(reports.lastSecondsAgo)})`]);
   else if (reports.missing) checks.push(["warn", "The skill doesn't report playback: paste the current skill code (step 3, Code)"]);
   else checks.push(["warn", "No playback report from the skill yet; it sends one when an Echo starts"]);
-  if ("connections" in tunnel) {
-    checks.push([tunnel.connections > 0 ? "ok" : "bad", `Tunnel: ${tunnel.connections} connections${tunnel.lastError ? `, last error: ${tunnel.lastError}` : ""}`]);
-  }
 
   const rejections = Object.entries(access.rejections);
   const facts: [string, string][] = [

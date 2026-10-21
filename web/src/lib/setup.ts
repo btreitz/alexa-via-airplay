@@ -100,8 +100,5 @@ export function blockingProblems(status: StatusResponse | null, offline: boolean
   }
   for (const check of status.checks) if (!check.ok) problems.push(check.message);
   for (const problem of status.system?.problems ?? []) problems.push(problem);
-  if (status.tunnel.enabled && "connections" in status.tunnel && status.tunnel.connections === 0) {
-    problems.push(`The built-in tunnel isn't connected${status.tunnel.lastError ? `: ${status.tunnel.lastError}` : "."}`);
-  }
   return problems;
 }

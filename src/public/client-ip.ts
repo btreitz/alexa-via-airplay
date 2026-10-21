@@ -1,6 +1,6 @@
 // Determines the real client address of a public request. A forwarded header
 // is believed only when the connection comes from a trusted proxy (by default
-// cloudflared on this host, i.e. loopback); otherwise anyone could spoof it.
+// a cloudflared on this host, i.e. loopback); otherwise anyone could spoof it.
 
 import net from "node:net";
 import { normalizeIp } from "./home-ip.ts";

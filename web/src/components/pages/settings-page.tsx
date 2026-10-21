@@ -180,7 +180,7 @@ export function SettingsPage() {
               <>
                 A .json file with everything this bridge has set up: the public URL, the skill&apos;s invocation name and signing secret, the Amazon
                 site, your speakers (names and AirPlay IDs) and which Echo is which, and the playback and security settings. Import it at the start
-                of the setup on the new host. Not included: the Amazon sign-in and the tunnel token in .env. The file contains the signing secret:
+                of the setup on the new host. Not included: the Amazon sign-in and the environment variables (.env). The file contains the signing secret:
                 keep it private.
               </>
             }

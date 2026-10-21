@@ -31,7 +31,8 @@ It takes about 30 minutes, most of it in Amazon's developer console.
   with the same account. Developer accounts are free.
 - **A way to make one port reachable over HTTPS from the internet**, with a
   public DNS name and a valid certificate. A Cloudflare Tunnel is the
-  simplest; see the next step.
+  simplest; see the next step. You run it yourself: the bridge doesn't
+  include or start one.
 
 ## 2. Publish the stream over HTTPS
 
@@ -53,15 +54,37 @@ You need a domain on Cloudflare (the free plan is fine).
 1. In the Cloudflare dashboard, open **Zero Trust → Networks → Tunnels →
    Create a tunnel**, type **Cloudflared**, and give it a name.
 2. On the install step, copy the **token**: the long string after
-   `--token` in the shown command, starting with `eyJ`. You don't need to
-   install anything; the container runs cloudflared itself.
+   `--token` in the shown command, starting with `eyJ`.
 3. Add a **public hostname**: subdomain e.g. `airplay`, your domain, service
    type **HTTP**, URL **`localhost:8099`**.
 4. Recommended: add a **Cache Rule** (Caching → Cache Rules) for that
    hostname with **Bypass cache**. The bridge already marks every answer as
    not cacheable; the rule makes sure that stays true.
+5. Run cloudflared with that token **on the bridge's host, with host
+   networking**, so `localhost:8099` reaches the bridge and the bridge
+   recognizes it as the trusted proxy on loopback. For example as its own
+   compose project or Portainer stack, kept apart from the bridge:
 
-Put the token into `.env` as `TUNNEL_TOKEN=…` (step 3).
+   ```yaml
+   services:
+     cloudflared:
+       image: cloudflare/cloudflared:2026.10.1
+       restart: unless-stopped
+       network_mode: host
+       command: tunnel --no-autoupdate run
+       environment:
+         TUNNEL_TOKEN: ${TUNNEL_TOKEN} # from .env or the stack's variables; never commit it
+   ```
+
+   Then set `PUBLIC_BIND=127.0.0.1` for the bridge (step 3): only
+   cloudflared needs the public port, so it stays off your LAN. The
+   defaults `CLIENT_IP_HEADER=cf-connecting-ip` and
+   `TRUSTED_PROXIES=127.0.0.1,::1` already fit this setup.
+
+   If cloudflared runs elsewhere (another host, or a container without host
+   networking), point the public hostname to `http://<bridge host>:8099`
+   instead, leave `PUBLIC_BIND` at its default, and set `TRUSTED_PROXIES`
+   to the address the bridge sees cloudflared connect from.
 
 Two pitfalls:
 
@@ -98,17 +121,21 @@ use `CLIENT_IP_HEADER=none`.
 ```bash
 git clone <this repository> alexa-via-airplay
 cd alexa-via-airplay
-cp .env.example .env        # then set TUNNEL_TOKEN if you use the built-in tunnel
+cp .env.example .env        # then set what you need, e.g. PUBLIC_BIND
 docker compose up -d --build
 docker compose logs --since 2m
 ```
 
-The log should show three passing checks (`host-network`, `ptp-ports`,
-`mdns`) and, with a tunnel token, `Registered tunnel connection`. Then
-open the web UI at **`http://<host>:8098/`**.
+With **Portainer**, create a stack from this Git repository (compose path
+`compose.yaml`) instead, and set the values from `.env.example` as the
+stack's environment variables. Portainer builds the image from the
+repository.
 
-All state (settings, Amazon session, signing secret) lives in the `data`
-volume. Back it up like any other secret; never commit it.
+The log should show three passing checks (`host-network`, `ptp-ports`,
+`mdns`). Then open the web UI at **`http://<host>:8098/`**.
+
+All state (settings, Amazon session, signing secret) lives in the volume
+`alexa-via-airplay_data`, whatever the compose project or stack is called. Back it up like any other secret; never commit it.
 
 Moving to another host: export the settings in the web UI (Settings →
 Export settings) and import the file on the new host's Introduction page
