@@ -5,7 +5,7 @@ import { ClientIpResolver } from "../../src/public/client-ip.ts";
 import { DeviceMapper } from "../../src/bridge/device-map.ts";
 import type { HomeIpVerdict } from "../../src/public/home-ip.ts";
 import { PublicServer, type StreamTarget } from "../../src/public/server.ts";
-import { signedQuery } from "../../src/public/signing.ts";
+import { eventSignature, signedQuery } from "../../src/public/signing.ts";
 import { tempStore } from "../helpers.ts";
 
 const HOME = "92.211.1.239";
@@ -180,5 +180,48 @@ test("recorded requests never contain the signature", () => {
   for (const r of server.recent) {
     assert.doesNotMatch(r.query, /sig=(?!<redacted>)/);
     assert.doesNotMatch(r.query, new RegExp(secret));
+  }
+});
+
+function reportQuery(e: string, d = BATH_D, exp = now() + 60, key = secret) {
+  return new URLSearchParams({ d, e, exp: String(exp), sig: eventSignature(key, e, d, exp) });
+}
+
+test("a signed skill report is taken once, from anywhere", async () => {
+  const reports: unknown[] = [];
+  const listener = (report: unknown) => reports.push(report);
+  server.on("skill-event", listener);
+  try {
+    const query = reportQuery("paused");
+    const res = await play(query, { method: "POST", ip: "3.250.1.1" }); // Amazon's cloud, not this home
+    assert.equal(res.status, 204);
+    assert.deepEqual(reports, [{ serial: BATH, receiverId: "bath", event: "paused" }]);
+    assert.ok(server.lastSkillReportAt !== null);
+    await expect404(await play(query, { method: "POST" })); // replayed
+    assert.equal(reports.length, 1);
+  } finally {
+    server.off("skill-event", listener);
+  }
+});
+
+test("skill reports that are wrongly signed, unknown or for unknown Echos are 404", async () => {
+  const reports: unknown[] = [];
+  const listener = (report: unknown) => reports.push(report);
+  server.on("skill-event", listener);
+  try {
+    await expect404(await play(reportQuery("paused", BATH_D, now() + 60, "another-secret-another-secret-12345"), { method: "POST" }));
+    await expect404(await play(reportQuery("rebooted"), { method: "POST" }));
+    await expect404(await play(reportQuery("started", "UNKNOWNDEVICE123"), { method: "POST" }));
+    await expect404(await play(reportQuery("started", BATH_D, now() - 120), { method: "POST" }));
+    // A stream URL's signature isn't a report's, and the other way round.
+    const stream = signedQuery(secret, BATH_D, now());
+    stream.set("e", "paused");
+    await expect404(await play(stream, { method: "POST" }));
+    const report = reportQuery("started");
+    report.delete("e");
+    await expect404(await play(report));
+    assert.deepEqual(reports, []);
+  } finally {
+    server.off("skill-event", listener);
   }
 });

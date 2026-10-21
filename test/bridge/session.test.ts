@@ -29,6 +29,8 @@ function harness(settings = { idleTimeoutSeconds: 60, forwardVolume: true }) {
     settings: () => settings,
     canControl: () => canControl,
     testing: () => testing,
+    endStream: (id) => calls.push(`end ${id}`),
+    allowStream: (serial) => calls.push(`allow ${serial}`),
     now: () => now,
     schedule: (fn, ms) => {
       const timer = { at: now + ms, fn, cancelled: false };
@@ -170,7 +172,7 @@ test("volume: sent only while connected, resent on connect, then at once on a ch
   h.advance(2000);
   assert.deepEqual(volumes(), []);
   h.sessions.onStreamOpen("bath");
-  h.advance(VOLUME_AFTER_CONNECT_MS + 1000, { audio: true });
+  h.advance(VOLUME_AFTER_CONNECT_MS + VOLUME_MIN_INTERVAL_MS + 1000, { audio: true }); // the harness steps in whole seconds
   assert.deepEqual(volumes(), ["volume SERIAL 20"]);
   await new Promise((r) => setImmediate(r)); // Amazon answered
   h.sessions.onEvent("bath", "volume", "-15.00,0,0,0");
@@ -278,4 +280,70 @@ test("play pressed after the user stopped the Echo starts it again", () => {
   h.advance(RETRIGGER_AFTER_MS + 1000); // the sender paused, no audio
   h.sessions.onEvent("bath", "ssnc/pres", "");
   assert.equal(h.calls.filter((c) => c.startsWith("trigger")).length, 2);
+});
+
+test("play events in a row start the Echo once (pres, then prsm)", () => {
+  const h = harness();
+  h.sessions.onEvent("bath", "ssnc/pres", "");
+  h.target.lastAudioAt = h.now;
+  h.sessions.onEvent("bath", "play_resume", "");
+  h.sessions.onEvent("bath", "active_start", "");
+  h.sessions.onAudio("bath");
+  h.advance(3000, { audio: true });
+  assert.deepEqual(h.calls, ["trigger SERIAL"]);
+});
+
+test("the skill reports a stop on the Echo: the sender pauses at once and the stream ends", () => {
+  const h = harness();
+  h.sessions.onEvent("bath", "active_start", "--");
+  h.advance(2000, { audio: true });
+  h.sessions.onStreamOpen("bath");
+  h.sessions.onSkillEvent("bath", "paused");
+  assert.deepEqual(h.calls.slice(1), ["remote bath pause", "end bath"]);
+  assert.equal(h.sessions.snapshot("bath").suppressed, true);
+  // The stream ending and the Echo's own PlaybackStopped report are part of the same stop.
+  h.sessions.onStreamClose("bath");
+  h.sessions.onSkillEvent("bath", "stopped");
+  h.advance(DROP_GRACE_MS + 60_000, { audio: true });
+  assert.deepEqual(h.calls.slice(1), ["remote bath pause", "end bath"]);
+});
+
+test("stop reports while the Echo isn't playing our stream, or after our own stop, are ignored", () => {
+  const h = harness({ idleTimeoutSeconds: 10, forwardVolume: false });
+  h.sessions.onEvent("bath", "active_start", "--");
+  h.sessions.onSkillEvent("bath", "stopped"); // no connection
+  h.advance(2000, { audio: true });
+  h.sessions.onStreamOpen("bath");
+  h.advance(12_000); // idle: the bridge stops the Echo
+  assert.equal(h.calls.at(-1), "stop SERIAL");
+  h.sessions.onSkillEvent("bath", "stopped");
+  assert.ok(!h.calls.some((c) => c.startsWith("remote")));
+  assert.equal(h.sessions.snapshot("bath").suppressed, false);
+});
+
+test("resumed on the Echo: the sender resumes, and the Echo isn't started a second time", () => {
+  const h = harness();
+  h.sessions.onEvent("bath", "active_start", "--");
+  h.advance(2000, { audio: true });
+  h.sessions.onStreamOpen("bath");
+  h.sessions.onSkillEvent("bath", "paused");
+  h.sessions.onStreamClose("bath");
+  h.advance(30_000); // paused
+  h.sessions.onSkillEvent("bath", "resumed");
+  assert.deepEqual(h.calls.slice(-2), ["allow SERIAL", "remote bath play"]);
+  assert.equal(h.sessions.snapshot("bath").suppressed, false);
+  h.advance(3000, { audio: true }); // the sender plays again; the Echo connects on its own
+  assert.equal(h.calls.filter((c) => c.startsWith("trigger")).length, 1);
+});
+
+test("resumed on the Echo without a sender does nothing", () => {
+  const h = harness();
+  h.sessions.onSkillEvent("bath", "resumed");
+  assert.deepEqual(h.calls, []);
+});
+
+test("a playback error from the Echo shows up as the session's error", () => {
+  const h = harness();
+  h.sessions.onSkillEvent("bath", "failed");
+  assert.match(h.sessions.snapshot("bath").lastError ?? "", /couldn't play/);
 });

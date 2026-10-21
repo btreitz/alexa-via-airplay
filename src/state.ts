@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
+import type { CatchUp } from "./airplay/echo-buffer.ts";
 
 export interface ReceiverEntry {
   /** Echo serial number from the Alexa API. */
@@ -31,6 +32,11 @@ export interface State {
   idleTimeoutSeconds: number;
   /** Forward the sender's AirPlay volume to the Echo. */
   forwardVolume: boolean;
+  /**
+   * Shorten the Echo's delay once it plays: leave out silence and pauses
+   * ("quiet"), or audio right away ("skip", one audible jump).
+   */
+  catchUp: CatchUp;
   /** Serve the public stream only to clients behind this home's public IP. */
   restrictToHomeIp: boolean;
   /** Set once the public URL check succeeded; enables automatic re-checks. */
@@ -52,6 +58,7 @@ export function defaults(): State {
     deviceMap: {},
     idleTimeoutSeconds: 60,
     forwardVolume: true,
+    catchUp: "quiet",
     restrictToHomeIp: true,
   };
 }

@@ -7,11 +7,18 @@ import { ConfirmButton } from "@/components/bridge/confirm-button";
 import { Section, ViewHeader } from "@/components/shell/view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useBridge } from "@/hooks/use-bridge";
 import { setSkillConfirmed } from "@/hooks/use-skill-confirmed";
 import { useSyncedState } from "@/hooks/use-synced-state";
-import { api, type SettingsUpdate } from "@/lib/api";
+import { api, type CatchUp, type SettingsUpdate } from "@/lib/api";
+
+const CATCH_UP: { value: CatchUp; label: string }[] = [
+  { value: "quiet", label: "In pauses and silence" },
+  { value: "skip", label: "Right away" },
+  { value: "off", label: "Off" },
+];
 
 /** Label and explanation on the left, the control on the right: the same for every setting. */
 function Row({ label, htmlFor, description, children }: { label: string; htmlFor?: string; description?: ReactNode; children: ReactNode }) {
@@ -90,6 +97,30 @@ export function SettingsPage() {
           </Row>
           <Row label="Volume follows AirPlay" htmlFor="forward-volume" description="Changing the volume on your iPhone or Mac sets it on the Echo.">
             <Switch id="forward-volume" checked={settings.forwardVolume} onCheckedChange={(on) => save({ forwardVolume: on })} />
+          </Row>
+          <Row
+            label="Catch up on the delay"
+            htmlFor="catch-up"
+            description={
+              <>
+                The Echo buffers a few seconds, so it plays behind your phone. Once it plays, the bridge can leave out a little audio until the Echo is
+                only about 1.5 s behind: in pauses and silence (nothing audible is lost), or right away (one short jump in the music). Needs the
+                current skill code.
+              </>
+            }
+          >
+            <Select value={settings.catchUp} onValueChange={(value) => save({ catchUp: value as CatchUp })}>
+              <SelectTrigger id="catch-up" className="w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CATCH_UP.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Row>
         </Group>
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { SpeakerIcon, Volume2Icon } from "lucide-react";
+import { InfoIcon, SpeakerIcon, Volume2Icon } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { AirPlayNameInput, AirPlaySwitch, TestSoundButton } from "@/components/bridge/speaker-controls";
 import { VolumeControl } from "@/components/bridge/volume-control";
 import { NeedsStep, ToneIcon } from "@/components/shell/status";
 import { Section, ViewHeader } from "@/components/shell/view";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useBridge } from "@/hooks/use-bridge";
@@ -177,6 +178,22 @@ export function SpeakersPage() {
         }
       />
       <div className="space-y-10">
+        {status.skillReports.missing && (
+          <Alert>
+            <InfoIcon />
+            <AlertTitle>Update the skill code</AlertTitle>
+            <AlertDescription>
+              <p>
+                Your skill doesn&apos;t report playback to the bridge yet. With the new code, &ldquo;Alexa, stop&rdquo; pauses your phone at once, and the
+                Echo starts sooner and plays less behind.{" "}
+                <Link href="/setup/skill/code" className="text-primary underline underline-offset-4">
+                  Paste the new code
+                </Link>
+                , then Save and Deploy.
+              </p>
+            </AlertDescription>
+          </Alert>
+        )}
         {on.length > 0 && (
           <div className="grid gap-4 md:grid-cols-2">
             {on.map((row) => (

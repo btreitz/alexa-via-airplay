@@ -2,6 +2,7 @@
 // change here that the UI doesn't follow fails its type-check.
 
 import type { AlexaDevice, AlexaState } from "../alexa/controller.ts";
+import type { CatchUp, EchoBufferStatus } from "../airplay/echo-buffer.ts";
 import type { Check } from "../airplay/host-checks.ts";
 import type { HomeIpStatus } from "../public/home-ip.ts";
 import type { Rejection, RequestRecord } from "../public/server.ts";
@@ -11,7 +12,7 @@ import type { SessionSnapshot } from "../bridge/session.ts";
 import type { SystemHealth } from "../airplay/system-services.ts";
 import type { TunnelStatus } from "../public/tunnel.ts";
 
-export type { AlexaDevice, AlexaState, Check, HomeIpStatus, PublicUrlResult, ReceiverStatus, RequestRecord, SessionSnapshot };
+export type { AlexaDevice, AlexaState, CatchUp, Check, EchoBufferStatus, HomeIpStatus, PublicUrlResult, ReceiverStatus, RequestRecord, SessionSnapshot };
 export type { ImportSummary, SettingsFile } from "../settings-file.ts";
 
 export interface ReceiverView extends ReceiverStatus {
@@ -32,6 +33,7 @@ export interface Settings {
   invocationName: string;
   idleTimeoutSeconds: number;
   forwardVolume: boolean;
+  catchUp: CatchUp;
   restrictToHomeIp: boolean;
 }
 
@@ -55,6 +57,12 @@ export interface StatusResponse {
   tunnel: TunnelStatus | { enabled: false };
   receivers: ReceiverView[];
   publicRequests: RequestRecord[];
+  /** The skill's playback reports ("Alexa, stop", the Echo's buffer). */
+  skillReports: {
+    lastSecondsAgo: number | null;
+    /** An Echo played, but no report came: the skill code predates them. */
+    missing: boolean;
+  };
 }
 
 export interface DeviceView extends AlexaDevice {
@@ -69,7 +77,7 @@ export interface SkillResponse {
   interactionModel: string;
 }
 
-export type SettingsUpdate = Partial<Pick<Settings, "invocationName" | "idleTimeoutSeconds" | "forwardVolume" | "restrictToHomeIp">> & {
+export type SettingsUpdate = Partial<Pick<Settings, "invocationName" | "idleTimeoutSeconds" | "forwardVolume" | "catchUp" | "restrictToHomeIp">> & {
   publicBaseUrl?: string | null;
 };
 

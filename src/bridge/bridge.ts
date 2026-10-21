@@ -15,6 +15,7 @@ import type { PublicUrlResult } from "../public/url-check.ts";
 import type { SessionManager } from "./session.ts";
 import { Tunnel } from "../public/tunnel.ts";
 import { launchPhrase } from "../alexa/skill.ts";
+import type { SkillEvent } from "../public/signing.ts";
 import { StateStore, type ReceiverEntry } from "../state.ts";
 import { TEST_SECONDS, TEST_VOLUME } from "./speaker-test.ts";
 import { SystemServices, waitFor } from "../airplay/system-services.ts";
@@ -22,6 +23,8 @@ import { SystemServices, waitFor } from "../airplay/system-services.ts";
 const log = logger("bridge");
 /** After a trigger, the Echo may connect for this long even without an AirPlay session. */
 export const TRIGGER_GRACE_MS = 20_000;
+/** A stop the skill reports this soon after the bridge stopped the Echo is that stop. */
+const OWN_STOP_MS = 10_000;
 
 export function defaultReceiverName(echoName: string): string {
   return `${echoName} (Alexa)`;
@@ -54,6 +57,7 @@ export class Bridge extends EventEmitter {
   readonly homeIp: HomeIpMonitor;
   readonly clientIp: ClientIpResolver;
   private readonly lastTriggerAt = new Map<string, number>();
+  private readonly lastStopAt = new Map<string, number>();
   private readonly tests = new Map<string, { endsAt: number; timer: NodeJS.Timeout }>();
   private readonly receivers = new Map<string, Receiver>();
   private reconciling: Promise<void> = Promise.resolve();
@@ -158,6 +162,7 @@ export class Bridge extends EventEmitter {
         runDir: this.config.runDir,
         runShairport: this.config.manageReceivers,
         mqtt: this.mqtt ? { port: this.mqtt.port, topic: this.mqtt.topicFor(id) } : undefined,
+        catchUp: () => this.store.get().catchUp,
       });
       receiver.start();
       this.receivers.set(id, receiver);
@@ -258,7 +263,41 @@ export class Bridge extends EventEmitter {
     this.receiverBySerial(serial)?.stream.stopTone();
   }
 
+  /** Lets an Echo connect without a trigger from the bridge, e.g. resumed on the Echo itself. */
+  allowStream(serial: string): void {
+    this.lastTriggerAt.set(serial, Date.now());
+  }
+
+  /** A playback report from the skill (public/server.ts). */
+  skillReport(serial: string, event: SkillEvent): void {
+    const receiver = this.receiverBySerial(serial);
+    if (!receiver) return;
+    if (event === "started") {
+      const start = receiver.stream.echoStarted();
+      log.info("Echo started playing", {
+        receiver: receiver.id,
+        afterMs: start.waitedMs,
+        audioSeconds: start.audioSeconds,
+        burstSeconds: start.burstSeconds,
+        startBufferSeconds: receiver.stream.echo.startBufferSeconds,
+      });
+      return;
+    }
+    if (event === "paused" || event === "stopped") {
+      const stoppedAt = this.lastStopAt.get(serial);
+      if (stoppedAt !== undefined && Date.now() - stoppedAt < OWN_STOP_MS) return;
+      if (this.tests.has(serial)) {
+        log.info("speaker test stopped on the Echo", { serial });
+        this.endTest(serial);
+        receiver.stream.dropAll();
+        return;
+      }
+    }
+    this.sessions?.onSkillEvent(receiver.id, event);
+  }
+
   async stopEcho(serial: string): Promise<void> {
+    this.lastStopAt.set(serial, Date.now());
     this.endTest(serial);
     log.info("stopping Echo", { serial });
     await this.alexa.stopPlayback(serial);
@@ -274,7 +313,7 @@ export class Bridge extends EventEmitter {
       const device = devices.get(entry.serial);
       const base: ReceiverStatus = receiver
         ? receiver.status()
-        : { id: receiverId(entry.serial), serial: entry.serial, name: entry.name, port: entry.port, process: null, audio: { active: false, secondsTotal: 0, lastAudioSecondsAgo: null, levelDb: null }, listeners: [] };
+        : { id: receiverId(entry.serial), serial: entry.serial, name: entry.name, port: entry.port, process: null, audio: { active: false, secondsTotal: 0, lastAudioSecondsAgo: null, levelDb: null }, listeners: [], echo: { startBufferSeconds: null, bufferedSeconds: null, lastStart: null, skippedSeconds: 0 } };
       return {
         ...base,
         mapped: this.mapper.isMapped(entry.serial),

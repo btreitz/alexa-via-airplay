@@ -20,6 +20,7 @@ test("redact strips tokens and cookies", () => {
 test("commands to one Echo are serialized; stopping goes ahead of waiting volume commands", async () => {
   const { AlexaController } = await import("../../src/alexa/controller.ts");
   const c = new AlexaController("/nonexistent/session.json");
+  c.volumeGapMs = 0;
   const order: string[] = [];
   let inFlight = 0;
   (c as any).current = { status: "ready" };
@@ -42,6 +43,7 @@ test("commands to one Echo are serialized; stopping goes ahead of waiting volume
 test("starting the Echo goes ahead of waiting volume commands, in order among its kind", async () => {
   const { AlexaController } = await import("../../src/alexa/controller.ts");
   const c = new AlexaController("/nonexistent/session.json");
+  c.volumeGapMs = 0;
   const order: string[] = [];
   (c as any).current = { status: "ready" };
   (c as any).remote = {
@@ -63,6 +65,26 @@ test("starting the Echo goes ahead of waiting volume commands, in order among it
     ["volume:10", "textCommand:open my sound bridge", "deviceStop:null", "volume:20", "volume:30"],
   );
   assert.ok(order.includes("volume:40"));
+});
+
+test("volume commands keep a gap to the account's previous command; starting the Echo doesn't wait", async () => {
+  const { AlexaController } = await import("../../src/alexa/controller.ts");
+  const c = new AlexaController("/nonexistent/session.json");
+  c.volumeGapMs = 80;
+  const sentAt: Record<string, number> = {};
+  (c as any).current = { status: "ready" };
+  (c as any).remote = {
+    sendSequenceCommand(serial: string, command: string, _value: unknown, cb: (err: Error | null) => void) {
+      sentAt[`${serial} ${command}`] = Date.now();
+      setImmediate(() => cb(null));
+    },
+  };
+  await c.textCommand("A", "open my sound bridge");
+  const volume = c.setVolume("B", 10);
+  await new Promise((r) => setTimeout(r, 40));
+  await Promise.all([volume, c.textCommand("C", "open my sound bridge")]); // C goes out while B waits
+  assert.ok(sentAt["C textCommand"] < sentAt["B volume"], "starting another Echo goes out at once");
+  assert.ok(sentAt["B volume"] - sentAt["C textCommand"] >= 70, "volume waits for the gap after the last command");
 });
 
 test("keepWarm refreshes the login check, at most every 30 s and only when signed in", async () => {

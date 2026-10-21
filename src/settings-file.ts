@@ -3,6 +3,7 @@
 // imported bridge works with the already deployed skill code.
 
 import { AMAZON_PAGES } from "./alexa/controller.ts";
+import { CATCH_UP_MODES, type CatchUp } from "./airplay/echo-buffer.ts";
 import { normalizeBaseUrl, validateInvocationName } from "./alexa/skill.ts";
 import { airplayDeviceIdFor } from "./airplay/receiver.ts";
 import { validateReceiverName } from "./bridge/bridge.ts";
@@ -98,6 +99,11 @@ export function parseSettingsFile(input: unknown): { state: State; summary: Impo
     if (raw[key] === undefined) continue;
     if (typeof raw[key] === "boolean") state[key] = raw[key];
     else problems.push(`${key} must be true or false`);
+  }
+
+  if (raw.catchUp !== undefined) {
+    if (CATCH_UP_MODES.includes(raw.catchUp as CatchUp)) state.catchUp = raw.catchUp as CatchUp;
+    else problems.push(`catchUp must be one of ${CATCH_UP_MODES.join(", ")}`);
   }
 
   if (raw.receivers !== undefined) {

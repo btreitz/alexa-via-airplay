@@ -6,6 +6,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AMAZON_PAGES } from "../alexa/controller.ts";
+import { CATCH_UP_MODES, type CatchUp } from "../airplay/echo-buffer.ts";
 import type { DeviceView, SkillResponse, StatusResponse } from "./api-types.ts";
 import type { Bridge } from "../bridge/bridge.ts";
 import { errorMessage, logger } from "../lib/log.ts";
@@ -224,6 +225,7 @@ export class UiServer {
           invocationName: state.invocationName,
           idleTimeoutSeconds: state.idleTimeoutSeconds,
           forwardVolume: state.forwardVolume,
+          catchUp: state.catchUp,
           restrictToHomeIp: state.restrictToHomeIp,
         },
         publicAccess: {
@@ -240,6 +242,10 @@ export class UiServer {
         tunnel: bridge.tunnel?.status() ?? { enabled: false as const },
         receivers: bridge.receiverStatuses(),
         publicRequests: this.publicServer.recent.slice(-20).reverse(),
+        skillReports: {
+          lastSecondsAgo: this.publicServer.lastSkillReportAt === null ? null : Math.round((Date.now() - this.publicServer.lastSkillReportAt) / 1000),
+          missing: this.publicServer.skillReportsMissing,
+        },
       };
     });
 
@@ -298,6 +304,11 @@ export class UiServer {
       if (body.forwardVolume !== undefined) {
         const value = Boolean(body.forwardVolume);
         changes.push((s) => (s.forwardVolume = value));
+      }
+      if (body.catchUp !== undefined) {
+        const value = body.catchUp;
+        if (!CATCH_UP_MODES.includes(value as CatchUp)) throw new HttpError(400, `Catch-up must be one of ${CATCH_UP_MODES.join(", ")}`);
+        changes.push((s) => (s.catchUp = value as CatchUp));
       }
       store.update((s) => changes.forEach((apply) => apply(s)));
       return { ok: true };

@@ -42,7 +42,8 @@ don't work. The Echo then fetches the stream itself, from your home through
 the public URL.
 
 Only one path is published: `/play.mp3` on the bridge's **public port
-(8099)**. Everything else there answers 404. The web UI (port 8098) must
+(8099)**: the Echo streams from it (GET), and your skill reports playback to
+it (POST). Everything else there answers 404. The web UI (port 8098) must
 never be published.
 
 ### Option A: Cloudflare Tunnel (recommended)
@@ -186,10 +187,16 @@ What happens automatically:
 - **AirPlay volume** → the Echo's volume follows (switchable).
 - **Paused for longer than the idle timeout** (default 60 s), or **AirPlay
   switched to another speaker** → the Echo stops.
-- **"Alexa, stop"** on the Echo → the iPhone/Mac is paused. This reacts
-  after about a minute, because the Echo keeps its connection open that
-  long and Amazon doesn't report a skill's playback state otherwise. Press
-  play on the sender to start again.
+- **"Alexa, stop"** (or the Echo's play/pause button) → the iPhone/Mac is
+  paused within a second or two: the skill reports it to the bridge.
+  **"Alexa, resume"** → the iPhone/Mac plays again. With skill code from
+  before these reports, the pause comes only after about a minute, when the
+  Echo drops the stream.
+- **Delay.** The Echo buffers a few seconds before it plays. The bridge
+  learns how much from the skill's reports, starts later sessions with a
+  burst of the latest audio so the Echo plays at once, and by default
+  catches up in pauses and silence until the Echo is about 1.5 s behind
+  (**Settings → Catch up on the delay**).
 
 ## 8. How the stream is protected
 
@@ -208,6 +215,12 @@ checks pass. Every failure gets the same plain 404.
    selected Echos, and that Echo must be in an active AirPlay session or
    have been started by the bridge seconds ago. One connection per Echo; a
    new one replaces the old.
+
+The skill's playback reports (`POST /play.mp3`) are signed the same way,
+over a different message, so a stream URL can't be used as a report or the
+other way round. Each report is accepted once. They come from Amazon's
+cloud, so the home IP check doesn't apply to them; they only tell the bridge
+that an Echo started, stopped or was resumed.
 
 What this protects against: someone who finds or guesses the URL, scanners,
 replayed or shared links (they expire), anyone outside your home, and

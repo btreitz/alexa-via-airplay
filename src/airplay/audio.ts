@@ -1,7 +1,9 @@
 // Per receiver: raw PCM from Shairport Sync's pipe → ffmpeg MP3 → every
 // connected HTTP client. While AirPlay is paused or idle, silence keeps the
 // MP3 stream flowing, otherwise the Echo drops the connection. During a
-// speaker test, a chime takes the place of that silence.
+// speaker test, a chime takes the place of that silence. A fresh Echo
+// connection starts with a burst of recent audio, and catch-up leaves audio
+// out while the Echo holds more than it needs (echo-buffer.ts).
 
 import { spawn, execFileSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
@@ -9,15 +11,20 @@ import fs from "node:fs";
 import net from "node:net";
 import type { Writable } from "node:stream";
 import { logger, type Logger } from "../lib/log.ts";
+import { EchoBuffer, PcmHistory, type CatchUp } from "./echo-buffer.ts";
 
 export const SAMPLE_RATE = 44100;
 export const BYTES_PER_SECOND = SAMPLE_RATE * 2 * 2; // S16_LE stereo
 const TICK_MS = 20;
 const SILENCE_AFTER_MS = 200;
 const ENCODER_LINGER_MS = 15_000;
+/** A connection this soon after the last one is the Echo reconnecting, not a new start. */
+const RECONNECT_MS = 5000;
+/** Silence written at most at once, e.g. after the event loop stalled. */
+const MAX_FILLER_MS = 1000;
 const MAX_CLIENT_BACKLOG = 1024 * 1024;
 const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
-const SILENCE = Buffer.alloc(Math.round((BYTES_PER_SECOND * TICK_MS) / 1000 / 4) * 4);
+const SILENCE = Buffer.alloc(Math.round((BYTES_PER_SECOND * MAX_FILLER_MS) / 1000 / 4) * 4);
 
 /**
  * ffmpeg's arguments. "-probesize 32 -analyzeduration 0" matter for latency: by
@@ -35,7 +42,7 @@ export const ENCODER_ARGS: readonly string[] = [
 
 /**
  * The test sound: two soft bell notes (A5, E5) every 1.5 s. Easy to hear and
- * clearly not music. Its length is a whole number of ticks, so it loops cleanly.
+ * clearly not music. It starts and ends near silence, so it loops cleanly.
  */
 export function chime(): Buffer {
   const frames = Math.round((SAMPLE_RATE * 1500) / 1000);
@@ -110,8 +117,8 @@ export class PcmInput extends EventEmitter {
     this.bytesTotal += data.length;
     this.lastDataAt = Date.now();
     this.measure(data);
-    this.emit("pcm", data);
     if (!wasActive) this.emit("active");
+    this.emit("pcm", data);
   }
 
   private measure(chunk: Buffer): void {
@@ -143,18 +150,31 @@ export interface ClientInfo {
 export class Mp3Broadcaster extends EventEmitter {
   private readonly input: PcmInput;
   private readonly log: Logger;
+  private readonly catchUp: () => CatchUp;
   private encoder?: ChildProcessWithoutNullStreams;
   private readonly clients = new Map<Writable, ClientInfo>();
   private silenceTimer?: NodeJS.Timeout;
   private lingerTimer?: NodeJS.Timeout;
   private nextId = 1;
   private tone?: { sound: Buffer; offset: number };
+  /** Up to where silence was written (ms); the filler keeps the stream at real-time pace. */
+  private filledUntil = 0;
+  private lastClientLeftAt = 0;
+  /** The audio of the current play run, for a new Echo's start burst. */
+  readonly history = new PcmHistory();
+  readonly echo = new EchoBuffer();
 
-  constructor(name: string, input: PcmInput) {
+  constructor(name: string, input: PcmInput, catchUp: () => CatchUp = () => "off") {
     super();
     this.input = input;
+    this.catchUp = catchUp;
     this.log = logger(`stream:${name}`);
-    this.input.on("pcm", (chunk: Buffer) => this.encoder?.stdin.write(chunk));
+    // Audio after a pause is a new play run; what came before isn't replayed.
+    this.input.on("active", () => this.history.clear());
+    this.input.on("pcm", (chunk: Buffer) => {
+      this.history.push(chunk);
+      this.feed(chunk);
+    });
   }
 
   get clientList(): ClientInfo[] {
@@ -163,7 +183,12 @@ export class Mp3Broadcaster extends EventEmitter {
 
   add(res: Writable, info: Omit<ClientInfo, "id" | "connectedAt">): ClientInfo {
     clearTimeout(this.lingerTimer);
-    this.startEncoder();
+    const fresh = this.clients.size === 0 && Date.now() - this.lastClientLeftAt > RECONNECT_MS;
+    if (fresh) this.startFresh();
+    else {
+      this.startEncoder();
+      this.echo.reconnect();
+    }
     const client = { ...info, id: this.nextId++, connectedAt: Date.now() };
     this.clients.set(res, client);
     const remove = () => this.remove(res);
@@ -179,8 +204,31 @@ export class Mp3Broadcaster extends EventEmitter {
     this.clients.delete(res);
     this.emit("client-removed", client, Date.now() - client.connectedAt);
     if (this.clients.size === 0) {
+      this.lastClientLeftAt = Date.now();
       this.lingerTimer = setTimeout(() => this.stopEncoder(), ENCODER_LINGER_MS);
     }
+  }
+
+  /**
+   * A new Echo connection: a fresh encoder (nothing old in its pipeline), then
+   * the start burst, the latest audio of this play run up to the Echo's
+   * learned pre-buffer.
+   */
+  private startFresh(): void {
+    this.stopEncoder();
+    this.startEncoder();
+    const burstSeconds = this.echo.connect();
+    if (burstSeconds <= 0 || !this.input.active) return;
+    const burst = this.history.latest(burstSeconds);
+    if (burst.length === 0) return;
+    this.encoder!.stdin.write(burst);
+    this.echo.sent(burst.length, true);
+    this.log.info("start burst", { seconds: Math.round((burst.length / BYTES_PER_SECOND) * 10) / 10 });
+  }
+
+  /** The skill reported that the Echo started playing. */
+  echoStarted() {
+    return this.echo.started();
   }
 
   /** Plays the test chime wherever silence would go, until stopTone(). */
@@ -196,11 +244,28 @@ export class Mp3Broadcaster extends EventEmitter {
     return this.tone !== undefined;
   }
 
-  private filler(): Buffer {
-    if (!this.tone) return SILENCE;
-    const { sound, offset } = this.tone;
-    this.tone.offset = (offset + SILENCE.length) % sound.length;
-    return sound.subarray(offset, offset + SILENCE.length);
+  /** `bytes` of silence, or of the chime during a test. */
+  private filler(bytes: number): Buffer {
+    if (!this.tone) return SILENCE.subarray(0, bytes);
+    const out = Buffer.alloc(bytes);
+    let written = 0;
+    while (written < bytes) {
+      const { sound, offset } = this.tone;
+      const n = Math.min(bytes - written, sound.length - offset);
+      sound.copy(out, written, offset, offset + n);
+      written += n;
+      this.tone.offset = (offset + n) % sound.length;
+    }
+    return out;
+  }
+
+  /** PCM to the encoder, unless catch-up leaves it out. */
+  private feed(chunk: Buffer): void {
+    const encoder = this.encoder;
+    if (!encoder) return;
+    if (this.clients.size > 0 && !this.tone && this.echo.skip(chunk, this.catchUp())) return;
+    encoder.stdin.write(chunk);
+    this.echo.sent(chunk.length);
   }
 
   /** Ends every current connection (a new one for the same Echo replaces them). */
@@ -237,8 +302,20 @@ export class Mp3Broadcaster extends EventEmitter {
         setTimeout(() => this.clients.size > 0 && this.startEncoder(), 500);
       }
     });
+    // Silence continues where the audio stopped, as much as time has passed:
+    // a timer alone runs a little slow, and the Echo would slowly run dry.
+    this.filledUntil = Date.now();
     this.silenceTimer = setInterval(() => {
-      if (!this.input.active) encoder.stdin.write(this.filler());
+      const now = Date.now();
+      if (this.input.active) {
+        this.filledUntil = now;
+        return;
+      }
+      const from = Math.max(this.filledUntil, this.input.lastDataAt, now - MAX_FILLER_MS);
+      const bytes = Math.floor(((now - from) * BYTES_PER_SECOND) / 1000 / 4) * 4;
+      if (bytes <= 0) return;
+      this.filledUntil = from + (bytes * 1000) / BYTES_PER_SECOND;
+      this.feed(this.filler(bytes));
     }, TICK_MS);
   }
 

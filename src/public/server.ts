@@ -8,6 +8,10 @@
 //      after the bridge triggered it), and that Echo has an active AirPlay
 //      session or was triggered moments ago
 //
+// It also takes the skill's playback reports, POST /play.mp3?d&e&exp&sig with
+// a differently signed message. They come from Amazon's cloud, not from this
+// home, so check 2 doesn't apply; each signature is accepted once.
+//
 // Every failure gets the same plain 404. Query strings are never logged.
 
 import crypto from "node:crypto";
@@ -18,7 +22,7 @@ import type { ClientIpResolver } from "./client-ip.ts";
 import { isValidDeviceId, type DeviceMapper } from "../bridge/device-map.ts";
 import { logger } from "../lib/log.ts";
 import type { HomeIpVerdict } from "./home-ip.ts";
-import { redactQuery, verifySignature } from "./signing.ts";
+import { CLOCK_SKEW_SECONDS, isSkillEvent, redactQuery, verifyEventSignature, verifySignature, type SkillEvent } from "./signing.ts";
 import type { StateStore } from "../state.ts";
 
 const log = logger("public");
@@ -51,6 +55,12 @@ export interface StreamEvent {
   userAgent: string | null;
 }
 
+export interface SkillReport {
+  serial: string;
+  receiverId: string;
+  event: SkillEvent;
+}
+
 export type Rejection =
   | "path" | "signature" | "home-ip-mismatch" | "home-ip-unknown" | "client-ip-unknown"
   | "device-unknown" | "device-ambiguous" | "not-selected" | "no-session";
@@ -65,8 +75,10 @@ export interface RequestRecord {
 }
 
 const NOT_FOUND_BODY = "Not found\n";
+/** The skill reports PlaybackStarted within seconds of the Echo connecting. */
+const SKILL_REPORT_EXPECTED_MS = 20_000;
 
-/** Emits "stream-open" (StreamEvent) and "stream-close" (StreamEvent, seconds). */
+/** Emits "stream-open" (StreamEvent), "stream-close" (StreamEvent, seconds) and "skill-event" (SkillReport). */
 export class PublicServer extends EventEmitter {
   private readonly deps: PublicServerDeps;
   private server?: http.Server;
@@ -74,6 +86,12 @@ export class PublicServer extends EventEmitter {
   readonly rejections: Partial<Record<Rejection, number>> = {};
   /** Set while requests fail because the home IP can't be determined. */
   homeIpUnknownSince: number | null = null;
+  /** When the skill last reported playback; null = never since the bridge started. */
+  lastSkillReportAt: number | null = null;
+  /** When an Echo first streamed since the bridge started. */
+  private firstStreamAt: number | null = null;
+  /** Report signatures already accepted, with their expiry, so a report can't be replayed. */
+  private readonly usedReports = new Map<string, number>();
 
   constructor(deps: PublicServerDeps) {
     super();
@@ -162,6 +180,44 @@ export class PublicServer extends EventEmitter {
     });
   }
 
+  /**
+   * An Echo played for a while, but the skill never reported it: its code is
+   * from before playback reports (or can't reach the bridge).
+   */
+  get skillReportsMissing(): boolean {
+    return this.lastSkillReportAt === null && this.firstStreamAt !== null && Date.now() - this.firstStreamAt > SKILL_REPORT_EXPECTED_MS;
+  }
+
+  private nowSeconds(): number {
+    return this.deps.nowSeconds ? this.deps.nowSeconds() : Math.floor(Date.now() / 1000);
+  }
+
+  /** A playback report from the skill: signed, not replayed, for a selected Echo. */
+  private handleReport(req: http.IncomingMessage, res: http.ServerResponse, url: URL): void {
+    req.resume(); // no body expected; drain whatever comes
+    const query = redactQuery(url.searchParams);
+    const remote = this.deps.clientIp.resolve(req.socket.remoteAddress, req.headers);
+    const { d, e, exp, sig } = Object.fromEntries(["d", "e", "exp", "sig"].map((k) => [k, url.searchParams.get(k)]));
+    if (!isSkillEvent(e)) return this.reject(req, res, "signature", remote, query, "unknown report");
+    const now = this.nowSeconds();
+    const verdict = verifyEventSignature(this.deps.store.get().signingSecret, e, d, exp, sig, now);
+    if (!verdict.ok) return this.reject(req, res, "signature", remote, query, verdict.reason);
+    if (!isValidDeviceId(d)) return this.reject(req, res, "signature", remote, query, "invalid device id");
+    for (const [used, expires] of this.usedReports) if (expires < now - CLOCK_SKEW_SECONDS) this.usedReports.delete(used);
+    if (this.usedReports.has(sig!)) return this.reject(req, res, "signature", remote, query, "replayed");
+    this.usedReports.set(sig!, Number(exp));
+
+    const serial = this.deps.store.get().deviceMap[d];
+    if (!serial) return this.reject(req, res, "device-unknown", remote, query);
+    const receiver = this.deps.receiverFor(serial);
+    if (!receiver) return this.reject(req, res, "not-selected", remote, query, serial);
+    res.writeHead(204, { "Cache-Control": "no-store" });
+    res.end();
+    this.lastSkillReportAt = Date.now();
+    this.record(req, 204, remote, query, `skill reports ${e}, ${receiver.id}`);
+    this.emit("skill-event", { serial, receiverId: receiver.id, event: e } satisfies SkillReport);
+  }
+
   private async handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const url = new URL(req.url || "/", "http://localhost");
     const probe = url.searchParams.get("probe");
@@ -171,6 +227,7 @@ export class PublicServer extends EventEmitter {
         return this.notFound(res);
       }
     }
+    if (url.pathname === "/play.mp3" && req.method === "POST") return this.handleReport(req, res, url);
     if (url.pathname !== "/play.mp3" || (req.method !== "GET" && req.method !== "HEAD")) {
       // Scanners hit everything; count them, don't fill the log.
       this.rejections.path = (this.rejections.path || 0) + 1;
@@ -185,7 +242,7 @@ export class PublicServer extends EventEmitter {
 
     // 1. Signed by the skill, not expired.
     const d = url.searchParams.get("d");
-    const nowSeconds = this.deps.nowSeconds ? this.deps.nowSeconds() : Math.floor(Date.now() / 1000);
+    const nowSeconds = this.nowSeconds();
     const verdict = verifySignature(state.signingSecret, d, url.searchParams.get("exp"), url.searchParams.get("sig"), nowSeconds);
     if (!verdict.ok) return this.reject(req, res, "signature", remote, query, verdict.reason);
     if (!isValidDeviceId(d)) return this.reject(req, res, "signature", remote, query, "invalid device id");
@@ -232,6 +289,7 @@ export class PublicServer extends EventEmitter {
     const replaced = receiver.stream.dropAll();
     const event: StreamEvent = { serial, receiverId: receiver.id, remote, userAgent: req.headers["user-agent"] || null };
     this.record(req, 200, remote, query, replaced ? `stream ${receiver.id}, replaced ${replaced}` : `stream ${receiver.id}`);
+    this.firstStreamAt ??= Date.now();
     receiver.stream.add(res, { remote, userAgent: event.userAgent });
     this.emit("stream-open", event);
     const openedAt = Date.now();

@@ -4,13 +4,29 @@ import { StatusLine, type Tone } from "@/components/shell/status";
 import { Section, ViewHeader } from "@/components/shell/view";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useBridge } from "@/hooks/use-bridge";
-import type { HomeIpStatus } from "@/lib/api";
+import type { HomeIpStatus, ReceiverView } from "@/lib/api";
 import { ago } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 function family(f: HomeIpStatus["ipv4"]): string {
   if (f.ip) return `${f.ip}${f.usable ? "" : " (stale)"} · ${ago(f.checkedAt)}`;
   return f.error ? `unknown (${f.error})` : "unknown";
+}
+
+/** What the bridge knows about one Echo's buffer, i.e. its delay. */
+function delay(r: ReceiverView): string {
+  const { echo } = r;
+  if (echo.startBufferSeconds === null) return "Not measured yet (the skill reports it when the Echo starts)";
+  const parts = [`Buffers ${echo.startBufferSeconds} s before it plays`];
+  if (echo.bufferedSeconds !== null) parts.push(`now ${echo.bufferedSeconds} s behind`);
+  if (echo.lastStart) parts.push(`last start ${(echo.lastStart.waitedMs / 1000).toFixed(1)} s after connecting, with ${echo.lastStart.burstSeconds} s burst`);
+  if (echo.skippedSeconds > 0) parts.push(`${echo.skippedSeconds} s left out to catch up`);
+  return parts.join(" · ");
+}
+
+function secondsAgo(seconds: number): string {
+  if (seconds < 60) return `${seconds} s ago`;
+  return seconds < 3600 ? `${Math.round(seconds / 60)} min ago` : `${Math.round(seconds / 3600)} h ago`;
 }
 
 function uptime(seconds: number): string {
@@ -46,6 +62,10 @@ export function DiagnosticsPage() {
     for (const [running, label] of services) checks.push([running ? "ok" : "bad", `${label} ${running ? "running" : "not running"}`]);
   }
   checks.push(check ? [check.ok ? "ok" : "bad", `Public URL: ${check.message}`] : ["warn", "Public URL not checked yet"]);
+  const reports = status.skillReports;
+  if (reports.lastSecondsAgo !== null) checks.push(["ok", `The skill reports playback (last ${secondsAgo(reports.lastSecondsAgo)})`]);
+  else if (reports.missing) checks.push(["warn", "The skill doesn't report playback: paste the current skill code (step 3, Code)"]);
+  else checks.push(["warn", "No playback report from the skill yet; it sends one when an Echo starts"]);
   if ("connections" in tunnel) {
     checks.push([tunnel.connections > 0 ? "ok" : "bad", `Tunnel: ${tunnel.connections} connections${tunnel.lastError ? `, last error: ${tunnel.lastError}` : ""}`]);
   }
@@ -72,6 +92,12 @@ export function DiagnosticsPage() {
             ))}
           </div>
         </Section>
+
+        {status.receivers.length > 0 && (
+          <Section title="Delay">
+            <Facts rows={status.receivers.map((r) => [r.name, delay(r)])} />
+          </Section>
+        )}
 
         <Section title="Public access">
           <Facts rows={facts} />

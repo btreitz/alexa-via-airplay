@@ -18,6 +18,12 @@ const COMMAND_TIMEOUT_MS = 15_000;
 /** alexa-remote2 re-checks the login before a command once its last check is 30 min old. */
 const AUTH_REFRESH_MS = 25 * 60_000;
 const WARM_MIN_INTERVAL_MS = 30_000;
+/**
+ * Volume commands keep at least this gap to the previous command of the
+ * account (any Echo): commands in quick succession get throttled, and
+ * alexa-remote2 then retries them only 30–60 s later.
+ */
+export const VOLUME_GAP_MS = 1000;
 
 // alexa-remote2 sends its requests with Node's global HTTPS agent, which keeps
 // idle connections for only 5 s. Amazon keeps them open for minutes, so keep
@@ -106,6 +112,9 @@ export class AlexaController extends EventEmitter {
   private amazonPage?: string;
   private readonly queues = new Map<string, { busy: boolean; waiting: QueuedCommand[] }>();
   private lastWarmAt = 0;
+  private lastCommandAt = 0;
+  /** VOLUME_GAP_MS; shorter in tests. */
+  volumeGapMs = VOLUME_GAP_MS;
   private warmTimer?: NodeJS.Timeout;
 
   constructor(sessionFile: string) {
@@ -222,7 +231,7 @@ export class AlexaController extends EventEmitter {
       return;
     }
     queue.busy = true;
-    Promise.resolve()
+    (item.first ? Promise.resolve() : this.gapAfterLastCommand())
       .then(() => this.sendNow(serial, item.command, item.value))
       .then(
         () => item.resolve(),
@@ -234,8 +243,18 @@ export class AlexaController extends EventEmitter {
       });
   }
 
+  /** Resolves once VOLUME_GAP_MS have passed since the account's last command (which may change meanwhile). */
+  private async gapAfterLastCommand(): Promise<void> {
+    for (;;) {
+      const wait = this.lastCommandAt + this.volumeGapMs - Date.now();
+      if (wait <= 0) return;
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  }
+
   private sendNow(serial: string, command: string, value: unknown): Promise<void> {
     const remote = this.requireReady();
+    this.lastCommandAt = Date.now();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`Amazon did not answer ${command} within ${COMMAND_TIMEOUT_MS / 1000} s`)), COMMAND_TIMEOUT_MS);
       remote.sendSequenceCommand(serial, command, value, (err) => {

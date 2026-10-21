@@ -33,6 +33,8 @@ async function main(): Promise<void> {
     settings: () => bridge.store.get(),
     canControl: () => bridge.alexa.ready,
     testing: (serial) => bridge.testing(serial),
+    endStream: (id) => bridge.receiverById(id)?.stream.dropAll(),
+    allowStream: (serial) => bridge.allowStream(serial),
   });
   bridge.sessions = sessions;
   bridge.on("receiver-added", (receiver) => {
@@ -43,6 +45,7 @@ async function main(): Promise<void> {
   bridge.on("receiver-removed", (receiver) => sessions.forget(receiver.id));
   publicServer.on("stream-open", (event) => sessions.onStreamOpen(event.receiverId));
   publicServer.on("stream-close", (event) => sessions.onStreamClose(event.receiverId));
+  publicServer.on("skill-event", (report) => bridge.skillReport(report.serial, report.event));
   // A sender connecting or starting: the next Amazon command is likely starting
   // an Echo, so have the login check and the connection ready for it.
   const warmUpEvents = new Set(["client_ip", "active_start", "play_start"]);

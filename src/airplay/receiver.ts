@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { Mp3Broadcaster, PcmInput, BYTES_PER_SECOND } from "./audio.ts";
+import type { CatchUp, EchoBufferStatus } from "./echo-buffer.ts";
 import type { ReceiverEntry } from "../state.ts";
 import { Supervised } from "../lib/supervisor.ts";
 
@@ -87,6 +88,8 @@ export interface ReceiverStatus {
   process: { running: boolean; restarts: number } | null;
   audio: { active: boolean; secondsTotal: number; lastAudioSecondsAgo: number | null; levelDb: number | null };
   listeners: { remote: string | null; userAgent: string | null; seconds: number }[];
+  /** The Echo's buffer, i.e. its delay (from the skill's playback reports). */
+  echo: EchoBufferStatus;
 }
 
 export interface ReceiverOptions {
@@ -95,6 +98,8 @@ export interface ReceiverOptions {
   /** Start Shairport Sync. Off for development without it. */
   runShairport: boolean;
   mqtt?: { port: number; topic: string };
+  /** The catch-up setting, read on every chunk so a change applies at once. */
+  catchUp?: () => CatchUp;
 }
 
 export class Receiver {
@@ -118,7 +123,7 @@ export class Receiver {
     fs.mkdirSync(confs, { recursive: true });
     this.confFile = path.join(confs, `${this.id}.conf`);
     this.input = new PcmInput(path.join(pipes, this.id));
-    this.stream = new Mp3Broadcaster(this.id, this.input);
+    this.stream = new Mp3Broadcaster(this.id, this.input, options.catchUp);
     if (options.runShairport) {
       this.shairport = new Supervised({
         name: `airplay:${this.id}`,
@@ -197,6 +202,7 @@ export class Receiver {
         userAgent: c.userAgent,
         seconds: Math.round((now - c.connectedAt) / 1000),
       })),
+      echo: this.stream.echo.status(),
     };
   }
 }

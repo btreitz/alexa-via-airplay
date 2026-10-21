@@ -1,9 +1,10 @@
 // Session logic per receiver: AirPlay starts → start the Echo; AirPlay idle or
-// gone → stop the Echo; Echo stopped by the user → pause the sender; sender
-// volume → Echo volume.
+// gone → stop the Echo; Echo stopped by the user → pause the sender; resumed
+// on the Echo → resume the sender; sender volume → Echo volume.
 //
 // Inputs: Shairport Sync's events (event-bus.ts), audio activity on the PCM
-// pipe, and the Echo's stream connections (public-server.ts).
+// pipe, the Echo's stream connections and the skill's playback reports
+// (public/server.ts).
 //
 // Starting the Echo takes a few seconds (Amazon, skill, Echo connects), so it
 // starts as early as is certain: when the sender sets the play rate ("pres",
@@ -22,18 +23,18 @@ export const RETRIGGER_AFTER_MS = 20_000;
 export const MAX_TRIGGER_ATTEMPTS = 3;
 /**
  * An Echo that dropped the stream gets this long to reconnect before we treat
- * it as stopped. Note: after "Alexa, stop" the Echo itself keeps the
- * connection open for about 60 s, so this signal arrives late; Amazon's API
- * doesn't report a skill's audio state, so there is no faster one.
+ * it as stopped. After "Alexa, stop" the Echo keeps the connection open for
+ * about 60 s, so this is only the fallback; the skill's report is the fast
+ * signal (onSkillEvent).
  */
 export const DROP_GRACE_MS = 3000;
 /**
  * A volume change is sent at once; while commands follow each other (a slider
  * being dragged), at most one starts per this interval, with the latest value.
- * More would risk Amazon's throttling, which alexa-remote2 answers with a
- * 10–80 s pause.
+ * Amazon throttled commands 0.4–1 s apart (they went unanswered and were
+ * retried by alexa-remote2 30–60 s later), so this stays well above that.
  */
-export const VOLUME_MIN_INTERVAL_MS = 400;
+export const VOLUME_MIN_INTERVAL_MS = 1500;
 /** Give a freshly connected Echo a moment before changing its volume. */
 export const VOLUME_AFTER_CONNECT_MS = 1500;
 /**
@@ -74,6 +75,10 @@ export interface SessionDeps {
   canControl(): boolean;
   /** A speaker test runs: it sets its own volume and ends the Echo itself. */
   testing?(serial: string): boolean;
+  /** Ends the Echo's stream connection on our side. */
+  endStream?(id: string): void;
+  /** Lets the Echo connect without a trigger from us (it was resumed on the Echo). */
+  allowStream?(serial: string): void;
   now?: () => number;
   schedule?: (fn: () => void, ms: number) => { cancel(): void };
 }
@@ -152,7 +157,7 @@ export class SessionManager {
       case "active_start":
         s.active = true;
         s.suppressed = false;
-        s.triggerAttempts = 0;
+        this.allowNewAttempts(s);
         target.setAirplaySession(true);
         break;
       case "active_end":
@@ -170,7 +175,7 @@ export class SessionManager {
         target.setAirplaySession(true);
         if (s.suppressed) log.info("sender plays again, Echo may be started again", { receiver: id });
         s.suppressed = false;
-        s.triggerAttempts = 0;
+        this.allowNewAttempts(s);
         break;
       case "ssnc/paus": // raw metadata: the sender paused before audio arrived; don't start the Echo for it
         s.playRequestedAt = 0;
@@ -186,6 +191,55 @@ export class SessionManager {
         return;
     }
     this.evaluate(id);
+  }
+
+  /**
+   * A new play gets new start attempts, but not while one is under way: play
+   * events come in groups (pres, prsm, …), and resetting on each started the
+   * Echo twice, which Amazon throttles.
+   */
+  private allowNewAttempts(s: ReceiverSession): void {
+    if (s.triggerAttempts > 0 && this.now() - s.lastTriggerAt < RETRIGGER_AFTER_MS) return;
+    s.triggerAttempts = 0;
+  }
+
+  /** The skill reported what happened on the Echo. */
+  onSkillEvent(id: string, event: string): void {
+    const target = this.deps.receiver(id);
+    if (!target) return;
+    const s = this.session(id);
+    switch (event) {
+      case "paused":
+      case "stopped": {
+        // Ours (idle stop, sender left), or the Echo isn't playing our stream anyway.
+        if (s.connections === 0 || s.stoppingByUs || this.deps.testing?.(target.serial)) return;
+        log.info("Echo stopped on the Echo; pausing the sender", { receiver: id, report: event });
+        s.dropTimer?.cancel();
+        s.dropTimer = undefined;
+        s.suppressed = true;
+        if (s.active) this.deps.remote(id, "pause");
+        // The Echo would keep the connection for a minute; ending it isn't another stop.
+        s.stoppingByUs = true;
+        this.deps.endStream?.(id);
+        break;
+      }
+      case "resumed":
+        if (!s.active) return; // no sender to resume; the Echo's request will be refused
+        log.info("resumed on the Echo; resuming the sender", { receiver: id });
+        s.suppressed = false;
+        // The Echo is starting itself: count it as our attempt, so audio arriving doesn't start it twice.
+        s.triggerAttempts = 1;
+        s.lastTriggerAt = this.now();
+        this.deps.allowStream?.(target.serial);
+        this.deps.remote(id, "play");
+        break;
+      case "failed":
+        s.lastError = "The Echo couldn't play the stream. The skill's logs in the developer console have details.";
+        log.warn("the Echo reported a playback error", { receiver: id });
+        break;
+      default:
+        return;
+    }
   }
 
   onStreamOpen(id: string): void {
