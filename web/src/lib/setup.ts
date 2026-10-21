@@ -7,6 +7,7 @@ export type StepId = "url" | "amazon" | "skill" | "echos";
 
 /** Each view is a route (a folder under src/app). */
 export const HREF = {
+  intro: "/setup",
   url: "/setup/public-url",
   amazon: "/setup/amazon",
   skill: "/setup/skill/create",
@@ -83,8 +84,9 @@ export function setupSteps(status: StatusResponse, devices: DeviceView[], skillC
   ];
 }
 
-/** Where "/" leads: the first unfinished step, or the speakers once all are done. */
+/** Where "/" leads: the introduction on a fresh bridge, then the first unfinished step, then the speakers. */
 export function defaultView(steps: Step[]): ViewId {
+  if (steps.every((s) => !s.done)) return "intro";
   return steps.find((s) => !s.done)?.id ?? "speakers";
 }
 

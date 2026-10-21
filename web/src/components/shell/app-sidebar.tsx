@@ -4,7 +4,7 @@
 // because they come first in time; once they are done they fold away and the
 // daily pages lead.
 
-import { ActivityIcon, BookOpenIcon, CheckIcon, ChevronDownIcon, SettingsIcon, SpeakerIcon } from "lucide-react";
+import { ActivityIcon, BookOpenIcon, CheckIcon, ChevronDownIcon, InfoIcon, SettingsIcon, SpeakerIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -60,7 +60,7 @@ export function AppSidebar({ steps, view, playing, problems }: { steps: Step[]; 
   const close = () => setOpenMobile(false); // on phones the sidebar is a sheet over the page
   const doneCount = steps.filter((s) => s.done).length;
   const complete = doneCount === steps.length;
-  const onStep = steps.some((s) => s.id === view);
+  const onStep = view === "intro" || steps.some((s) => s.id === view);
   // Folded once complete, unless the user is looking at a step.
   const [open, setOpen] = useState<boolean | null>(null);
   const expanded = open ?? (!complete || onStep);
@@ -89,6 +89,20 @@ export function AppSidebar({ steps, view, playing, problems }: { steps: Step[]; 
             <CollapsibleContent>
               <SidebarGroupContent>
                 <SidebarMenu>
+                  {/* Not a step: nothing to finish here, so no number and no tick. */}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton size="lg" asChild isActive={view === "intro"}>
+                      <Link href={HREF.intro} onClick={close}>
+                        <span className={cn("grid size-6 shrink-0 place-items-center rounded-full border", view === "intro" ? "border-foreground" : "text-muted-foreground")}>
+                          <InfoIcon className="size-3.5!" />
+                        </span>
+                        <span className="grid min-w-0 leading-tight">
+                          <span className="truncate">Introduction</span>
+                          <span className="text-muted-foreground truncate text-xs">How it works, what you need</span>
+                        </span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                   {steps.map((step) => {
                     const current = step.id === view;
                     return (
@@ -97,8 +111,8 @@ export function AppSidebar({ steps, view, playing, problems }: { steps: Step[]; 
                           <Link href={HREF[step.id]} onClick={close} aria-current={current ? "step" : undefined}>
                             <StepMarker step={step} current={current} />
                             <span className="grid min-w-0 leading-tight">
-                              <span className={cn("truncate", !current && step.done && "text-muted-foreground")}>{step.title}</span>
-                              <span className="text-muted-foreground truncate text-xs font-normal">{step.summary}</span>
+                              <span className="truncate">{step.title}</span>
+                              <span className="text-muted-foreground truncate text-xs">{step.summary}</span>
                             </span>
                           </Link>
                         </SidebarMenuButton>

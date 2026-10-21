@@ -84,10 +84,11 @@ export function SettingsImport() {
     <div className="space-y-4 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="text-sm font-medium">Moving from another bridge?</div>
+          <div className="text-sm font-medium">Already have a settings file?</div>
           <p className="text-muted-foreground text-sm">
-            Import its settings file and skip most of the setup. Expected: the <code className="text-foreground">.json</code> file from
-            Settings → Export settings on the other bridge, or the <code className="text-foreground">state.json</code> from its data volume.
+            Import it to skip most of the setup, e.g. when moving the bridge to another host. Expected: the{" "}
+            <code className="text-foreground">.json</code> file from Settings → Export settings, or a <code className="text-foreground">state.json</code>{" "}
+            from a bridge&apos;s data volume.
           </p>
         </div>
         <Button variant="outline" className="shrink-0" disabled={stage.kind === "checking" || stage.kind === "applying"} onClick={() => input.current?.click()}>

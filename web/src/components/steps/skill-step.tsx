@@ -71,7 +71,7 @@ function PartTabs({ part }: { part: number }) {
             className="group w-full space-y-2 text-left"
           >
             <span className={cn("block h-1 rounded-full transition-colors", i <= part ? "bg-foreground" : "bg-muted group-hover:bg-muted-foreground/40")} />
-            <span className={cn("flex items-center gap-1 text-xs", i === part ? "font-medium" : "text-muted-foreground")}>
+            <span className={cn("flex items-center gap-1 text-xs", i === part ? "text-foreground" : "text-muted-foreground")}>
               <span className="tabular-nums">{i + 1}.</span>
               {label}
             </span>

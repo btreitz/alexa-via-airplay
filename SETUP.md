@@ -110,8 +110,8 @@ All state (settings, Amazon session, signing secret) lives in the `data`
 volume. Back it up like any other secret; never commit it.
 
 Moving to another host: export the settings in the web UI (Settings →
-Export settings) and import the file at the start of the setup on the new
-host (step 1, "Import settings"). The file holds the public URL, the
+Export settings) and import the file on the new host's Introduction page
+("Already have a settings file?"). The file holds the public URL, the
 skill's invocation name and signing secret, the Amazon site, the speakers
 and which Echo is which, and the playback and security settings, so the
 deployed skill keeps working. Not in the file: the Amazon sign-in (sign in
