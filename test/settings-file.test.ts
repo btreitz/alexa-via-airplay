@@ -10,6 +10,7 @@ function sample(): State {
     publicUrlVerifiedAt: "2026-10-20T10:00:00.000Z",
     amazonPage: "amazon.de",
     invocationName: "my sound bridge",
+    preset: "custom",
     idleTimeoutSeconds: 90,
     forwardVolume: false,
     receivers: [{ serial: "G0922J0624471P3C", name: "Bathroom", port: 7000, airplayDeviceId: "0A1B2C3D4E5F" }],
@@ -39,6 +40,16 @@ test("missing optional values get their defaults", () => {
   assert.equal(state.restrictToHomeIp, true);
   assert.deepEqual(state.receivers, []);
   assert.equal(state.publicBaseUrl, undefined);
+});
+
+test("a preset sets its values; settings from before presets get the preset they match", () => {
+  const { signingSecret } = sample();
+  const lowLatency = parseSettingsFile({ signingSecret, preset: "low-latency", idleTimeoutSeconds: 90, catchUp: "off" }).state;
+  assert.deepEqual([lowLatency.preset, lowLatency.catchUp, lowLatency.idleTimeoutSeconds], ["low-latency", "skip", 600]);
+  assert.equal(parseSettingsFile({ signingSecret, catchUp: "off" }).state.preset, "uninterrupted");
+  assert.equal(parseSettingsFile({ signingSecret }).state.preset, "balanced");
+  assert.equal(parseSettingsFile({ signingSecret, idleTimeoutSeconds: 90 }).state.preset, "custom");
+  assert.throws(() => parseSettingsFile({ signingSecret, preset: "loud" }), /preset must be one of/);
 });
 
 test("other files are refused with a clear message", () => {

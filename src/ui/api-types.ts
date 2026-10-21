@@ -3,6 +3,7 @@
 
 import type { AlexaDevice, AlexaState } from "../alexa/controller.ts";
 import type { CatchUp, EchoBufferStatus } from "../airplay/echo-buffer.ts";
+import type { Preset } from "../presets.ts";
 import type { Check } from "../airplay/host-checks.ts";
 import type { HomeIpStatus } from "../public/home-ip.ts";
 import type { Rejection, RequestRecord } from "../public/server.ts";
@@ -12,7 +13,7 @@ import type { SessionSnapshot } from "../bridge/session.ts";
 import type { SystemHealth } from "../airplay/system-services.ts";
 import type { TunnelStatus } from "../public/tunnel.ts";
 
-export type { AlexaDevice, AlexaState, CatchUp, Check, EchoBufferStatus, HomeIpStatus, PublicUrlResult, ReceiverStatus, RequestRecord, SessionSnapshot };
+export type { AlexaDevice, AlexaState, CatchUp, Preset, Check, EchoBufferStatus, HomeIpStatus, PublicUrlResult, ReceiverStatus, RequestRecord, SessionSnapshot };
 export type { ImportSummary, SettingsFile } from "../settings-file.ts";
 
 export interface ReceiverView extends ReceiverStatus {
@@ -31,6 +32,7 @@ export interface Settings {
   /** When the current URL last passed a check; survives restarts, unlike publicUrlCheck. */
   publicUrlVerifiedAt: string | null;
   invocationName: string;
+  preset: Preset;
   idleTimeoutSeconds: number;
   forwardVolume: boolean;
   catchUp: CatchUp;
@@ -77,7 +79,7 @@ export interface SkillResponse {
   interactionModel: string;
 }
 
-export type SettingsUpdate = Partial<Pick<Settings, "invocationName" | "idleTimeoutSeconds" | "forwardVolume" | "catchUp" | "restrictToHomeIp">> & {
+export type SettingsUpdate = Partial<Pick<Settings, "invocationName" | "preset" | "idleTimeoutSeconds" | "forwardVolume" | "catchUp" | "restrictToHomeIp">> & {
   publicBaseUrl?: string | null;
 };
 

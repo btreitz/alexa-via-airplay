@@ -12,6 +12,7 @@ import type { Bridge } from "../bridge/bridge.ts";
 import { errorMessage, logger } from "../lib/log.ts";
 import { interactionModel, launchPhrase, normalizeBaseUrl, skillIndexJs, streamUrl, validateInvocationName } from "../alexa/skill.ts";
 import { newSecret, type State } from "../state.ts";
+import { applyPreset, isPreset, PRESETS } from "../presets.ts";
 import { exportSettings, parseSettingsFile, type ImportSummary, type SettingsFile } from "../settings-file.ts";
 import type { PublicServer } from "../public/server.ts";
 import { checkPublicUrl } from "../public/url-check.ts";
@@ -223,6 +224,7 @@ export class UiServer {
           publicBaseUrlFromEnv: Boolean(bridge.config.publicBaseUrl),
           publicUrlVerifiedAt: state.publicUrlVerifiedAt ?? null,
           invocationName: state.invocationName,
+          preset: state.preset,
           idleTimeoutSeconds: state.idleTimeoutSeconds,
           forwardVolume: state.forwardVolume,
           catchUp: state.catchUp,
@@ -292,6 +294,13 @@ export class UiServer {
         const value = validateInvocationName(String(body.invocationName));
         changes.push((s) => (s.invocationName = value));
       }
+      // A preset fixes its values: they can only be changed one by one under "custom".
+      const preset = body.preset ?? store.get().preset;
+      if (!isPreset(preset)) throw new HttpError(400, `Preset must be one of ${PRESETS.join(", ")}`);
+      if (preset !== "custom" && (body.idleTimeoutSeconds !== undefined || body.catchUp !== undefined)) {
+        throw new HttpError(409, "These settings follow the preset; choose Custom to change them");
+      }
+      if (body.preset !== undefined) changes.push((s) => applyPreset(s, preset));
       if (body.idleTimeoutSeconds !== undefined) {
         const value = Number(body.idleTimeoutSeconds);
         if (!Number.isInteger(value) || value < 10 || value > 3600) throw new HttpError(400, "Idle timeout must be 10–3600 seconds");

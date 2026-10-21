@@ -6,6 +6,7 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import type { CatchUp } from "./airplay/echo-buffer.ts";
+import { applyPreset, DEFAULT_PRESET, isPreset, matchingPreset, type Preset } from "./presets.ts";
 
 export interface ReceiverEntry {
   /** Echo serial number from the Alexa API. */
@@ -28,6 +29,8 @@ export interface State {
   receivers: ReceiverEntry[];
   /** Skill device ID suffix (`d`) → Echo serial. */
   deviceMap: Record<string, string>;
+  /** Playback preset; unless "custom", it fixes idleTimeoutSeconds and catchUp. */
+  preset: Preset;
   /** Stop the Echo after AirPlay has been idle this long. */
   idleTimeoutSeconds: number;
   /** Forward the sender's AirPlay volume to the Echo. */
@@ -56,6 +59,7 @@ export function defaults(): State {
     invocationName: DEFAULT_INVOCATION_NAME,
     receivers: [],
     deviceMap: {},
+    preset: DEFAULT_PRESET,
     idleTimeoutSeconds: 60,
     forwardVolume: true,
     catchUp: "quiet",
@@ -109,6 +113,8 @@ export class StateStore extends EventEmitter {
       }
     }
     const state = { ...defaults(), ...stored };
+    // Settings from before presets get the one they match; a preset always has its values.
+    applyPreset(state, isPreset(stored.preset) ? stored.preset : matchingPreset(state));
     if (!stored.signingSecret) {
       this.state = state;
       this.save();

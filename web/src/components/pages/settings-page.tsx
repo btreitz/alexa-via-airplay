@@ -12,12 +12,19 @@ import { Switch } from "@/components/ui/switch";
 import { useBridge } from "@/hooks/use-bridge";
 import { setSkillConfirmed } from "@/hooks/use-skill-confirmed";
 import { useSyncedState } from "@/hooks/use-synced-state";
-import { api, type CatchUp, type SettingsUpdate } from "@/lib/api";
+import { api, type CatchUp, type Preset, type SettingsUpdate } from "@/lib/api";
 
 const CATCH_UP: { value: CatchUp; label: string }[] = [
   { value: "quiet", label: "In pauses and silence" },
   { value: "skip", label: "Right away" },
   { value: "off", label: "Off" },
+];
+
+const PRESETS: { value: Preset; label: string; description: string }[] = [
+  { value: "low-latency", label: "Low latency", description: "For video and games: the Echo catches up right away and stays connected through pauses of up to 10 minutes." },
+  { value: "balanced", label: "Balanced", description: "For music: the Echo catches up in pauses and silence, and stops after a minute of pause." },
+  { value: "uninterrupted", label: "Uninterrupted", description: "For podcasts and audiobooks: no audio is ever left out, so the Echo stays a few seconds behind." },
+  { value: "custom", label: "Custom", description: "Set the pause and the catch-up below yourself." },
 ];
 
 /** Label and explanation on the left, the control on the right: the same for every setting. */
@@ -48,6 +55,8 @@ export function SettingsPage() {
   const [idle, setIdle, idleState] = useSyncedState(String(status?.settings.idleTimeoutSeconds ?? 60));
   if (!status) return null;
   const { settings, alexa } = status;
+  const custom = settings.preset === "custom";
+  const preset = PRESETS.find((option) => option.value === settings.preset);
 
   // Switches apply at once; there is no separate save step to forget.
   const save = (update: SettingsUpdate) => run(() => api.updateSettings(update), "Saved");
@@ -81,6 +90,24 @@ export function SettingsPage() {
       <ViewHeader eyebrow="Bridge" title="Settings" description="Changes apply immediately." />
       <div className="space-y-8">
         <Group title="Playback">
+          <Row
+            label="Preset"
+            htmlFor="preset"
+            description={custom ? preset?.description : `${preset?.description} The pause and catch-up below follow it; choose Custom to change them.`}
+          >
+            <Select value={settings.preset} onValueChange={(value) => save({ preset: value as Preset })}>
+              <SelectTrigger id="preset" className="w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PRESETS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Row>
           <Row label="Stop the Echo after a pause of" htmlFor="idle" description="How long AirPlay may stay paused before the Echo stops.">
             <Input
               id="idle"
@@ -88,6 +115,7 @@ export function SettingsPage() {
               min={10}
               max={3600}
               className="w-24"
+              disabled={!custom}
               value={idle}
               onChange={(e) => setIdle(e.target.value)}
               onBlur={commitIdle}
@@ -109,7 +137,7 @@ export function SettingsPage() {
               </>
             }
           >
-            <Select value={settings.catchUp} onValueChange={(value) => save({ catchUp: value as CatchUp })}>
+            <Select value={settings.catchUp} disabled={!custom} onValueChange={(value) => save({ catchUp: value as CatchUp })}>
               <SelectTrigger id="catch-up" className="w-52">
                 <SelectValue />
               </SelectTrigger>

@@ -8,6 +8,7 @@ import { normalizeBaseUrl, validateInvocationName } from "./alexa/skill.ts";
 import { airplayDeviceIdFor } from "./airplay/receiver.ts";
 import { validateReceiverName } from "./bridge/bridge.ts";
 import { errorMessage } from "./lib/log.ts";
+import { applyPreset, isPreset, matchingPreset, PRESETS } from "./presets.ts";
 import { defaults, type ReceiverEntry, type State } from "./state.ts";
 
 export const SETTINGS_FORMAT = "alexa-via-airplay-settings";
@@ -105,6 +106,8 @@ export function parseSettingsFile(input: unknown): { state: State; summary: Impo
     if (CATCH_UP_MODES.includes(raw.catchUp as CatchUp)) state.catchUp = raw.catchUp as CatchUp;
     else problems.push(`catchUp must be one of ${CATCH_UP_MODES.join(", ")}`);
   }
+  if (raw.preset !== undefined && !isPreset(raw.preset)) problems.push(`preset must be one of ${PRESETS.join(", ")}`);
+  applyPreset(state, isPreset(raw.preset) ? raw.preset : matchingPreset(state));
 
   if (raw.receivers !== undefined) {
     if (!Array.isArray(raw.receivers)) problems.push("receivers must be a list");

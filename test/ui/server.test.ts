@@ -49,7 +49,24 @@ test("non-JSON and cross-origin writes are refused", async () => {
   assert.equal(bridge.store.get().idleTimeoutSeconds, 60);
 });
 
+test("a preset fixes its settings until it is set to custom", async () => {
+  assert.equal(bridge.store.get().preset, "balanced");
+  assert.equal((await put({ idleTimeoutSeconds: 120 })).status, 409);
+  assert.equal((await put({ catchUp: "skip" })).status, 409);
+  assert.equal((await put({ preset: "loud" })).status, 400);
+  assert.equal((await put({ preset: "low-latency" })).status, 200);
+  let s = bridge.store.get();
+  assert.deepEqual([s.catchUp, s.idleTimeoutSeconds], ["skip", 600]);
+  assert.equal((await put({ preset: "custom", catchUp: "off" })).status, 200);
+  s = bridge.store.get();
+  assert.deepEqual([s.preset, s.catchUp, s.idleTimeoutSeconds], ["custom", "off", 600]);
+  assert.equal((await put({ preset: "balanced" })).status, 200);
+  s = bridge.store.get();
+  assert.deepEqual([s.catchUp, s.idleTimeoutSeconds], ["quiet", 60]);
+});
+
 test("settings are validated", async () => {
+  assert.equal((await put({ preset: "custom" })).status, 200);
   assert.equal((await put({ idleTimeoutSeconds: 5 })).status, 400);
   assert.equal((await put({ publicBaseUrl: "http://plain.example.com" })).status, 400);
   assert.equal((await put({ invocationName: "alexa" })).status, 400);
@@ -102,7 +119,7 @@ test("settings export and import: dry run first, then apply", async () => {
   const exported = await (await fetch(`${base}/api/settings/export`)).json();
   assert.equal(exported.state.signingSecret, bridge.store.get().signingSecret);
 
-  const changed = { ...exported, state: { ...exported.state, idleTimeoutSeconds: 300 } };
+  const changed = { ...exported, state: { ...exported.state, preset: "custom", idleTimeoutSeconds: 300 } };
   const dry = await (await post({ file: changed })).json();
   assert.equal(dry.applied, false);
   assert.notEqual(bridge.store.get().idleTimeoutSeconds, 300);
