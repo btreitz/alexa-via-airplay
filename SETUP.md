@@ -196,7 +196,7 @@ What happens automatically:
   learns how much from the skill's reports, starts later sessions with a
   burst of the latest audio so the Echo plays at once, and by default
   catches up in pauses and silence until the Echo is about 1.5 s behind.
-  **Settings → Preset** picks how: **Low latency** (video, games) catches
+  **Settings → Preset** picks how: **Low latency** catches
   up right away and keeps the Echo connected through pauses of up to 10
   minutes; **Balanced** (the default, music) catches up in pauses and
   silence; **Uninterrupted** (podcasts, audiobooks) never leaves anything

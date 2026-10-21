@@ -21,7 +21,7 @@ const CATCH_UP: { value: CatchUp; label: string }[] = [
 ];
 
 const PRESETS: { value: Preset; label: string; description: string }[] = [
-  { value: "low-latency", label: "Low latency", description: "For video and games: the Echo catches up right away and stays connected through pauses of up to 10 minutes." },
+  { value: "low-latency", label: "Low latency", description: "The Echo catches up right away and stays connected through pauses of up to 10 minutes." },
   { value: "balanced", label: "Balanced", description: "For music: the Echo catches up in pauses and silence, and stops after a minute of pause." },
   { value: "uninterrupted", label: "Uninterrupted", description: "For podcasts and audiobooks: no audio is ever left out, so the Echo stays a few seconds behind." },
   { value: "custom", label: "Custom", description: "Set the pause and the catch-up below yourself." },
