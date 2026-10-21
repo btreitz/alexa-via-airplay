@@ -1,8 +1,13 @@
-// Docker HEALTHCHECK: the LAN listener answers /api/health.
+const HEALTHCHECK_TIMEOUT_MS = 4000;
 
-const host = !process.env.UI_BIND || process.env.UI_BIND === "0.0.0.0" ? "127.0.0.1" : process.env.UI_BIND;
+function uiHost(): string {
+  const bind = process.env.UI_BIND;
+  const host = !bind || bind === "0.0.0.0" ? "127.0.0.1" : bind;
+  return host.includes(":") ? `[${host}]` : host;
+}
+
 const port = process.env.UI_PORT || "8098";
 
-fetch(`http://${host.includes(":") ? `[${host}]` : host}:${port}/api/health`, { signal: AbortSignal.timeout(4000) })
+fetch(`http://${uiHost()}:${port}/api/health`, { signal: AbortSignal.timeout(HEALTHCHECK_TIMEOUT_MS) })
   .then((res) => process.exit(res.ok ? 0 : 1))
   .catch(() => process.exit(1));

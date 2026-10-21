@@ -3,7 +3,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { contentSecurityPolicy, inlineScriptHashes, StaticSite } from "../../src/ui/static-site.ts";
+import { contentSecurityPolicy, inlineScriptHashes } from "../../src/ui/csp.ts";
+import { StaticSite } from "../../src/ui/static-site.ts";
 import { tempDir } from "../helpers.ts";
 
 const inline = 'self.__next_f.push([1,"x"])';

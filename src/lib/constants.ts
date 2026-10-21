@@ -1,0 +1,4 @@
+export const MIN_RESTART_BACKOFF_MS = 1000;
+export const MAX_RESTART_BACKOFF_MS = 30_000;
+export const STABLE_AFTER_MS = 60_000;
+export const DEFAULT_STOP_GRACE_MS = 3000;

@@ -1,19 +1,34 @@
-// The LAN API's response shapes. The web UI imports these (type-only), so a
-// change here that the UI doesn't follow fails its type-check.
+import type {
+  CatchUp,
+  Check,
+  EchoBufferStatus,
+  ReceiverStatus,
+  SystemHealth,
+} from "../airplay/types.ts";
+import type { AlexaDevice, AlexaState } from "../alexa/types.ts";
+import type { SessionSnapshot } from "../bridge/types.ts";
+import type {
+  HomeIpStatus,
+  PublicUrlResult,
+  Rejection,
+  RequestRecord,
+} from "../public/types.ts";
+import type { Preset } from "../state/types.ts";
 
-import type { AlexaDevice, AlexaState } from "../alexa/controller.ts";
-import type { CatchUp, EchoBufferStatus } from "../airplay/echo-buffer.ts";
-import type { Preset } from "../presets.ts";
-import type { Check } from "../airplay/host-checks.ts";
-import type { HomeIpStatus } from "../public/home-ip.ts";
-import type { Rejection, RequestRecord } from "../public/server.ts";
-import type { PublicUrlResult } from "../public/url-check.ts";
-import type { ReceiverStatus } from "../airplay/receiver.ts";
-import type { SessionSnapshot } from "../bridge/session.ts";
-import type { SystemHealth } from "../airplay/system-services.ts";
-
-export type { AlexaDevice, AlexaState, CatchUp, Preset, Check, EchoBufferStatus, HomeIpStatus, PublicUrlResult, ReceiverStatus, RequestRecord, SessionSnapshot };
-export type { ImportSummary, SettingsFile } from "../settings-file.ts";
+export type {
+  AlexaDevice,
+  AlexaState,
+  CatchUp,
+  Check,
+  EchoBufferStatus,
+  HomeIpStatus,
+  Preset,
+  PublicUrlResult,
+  ReceiverStatus,
+  RequestRecord,
+  SessionSnapshot,
+};
+export type { ImportSummary, SettingsFile } from "../state/settings-file/types.ts";
 
 export interface ReceiverView extends ReceiverStatus {
   mapped: boolean;
@@ -21,14 +36,12 @@ export interface ReceiverView extends ReceiverStatus {
   echoModel?: string | null;
   echoOnline?: boolean;
   session: SessionSnapshot | null;
-  /** A running speaker test (chime on the Echo). */
   test: { secondsLeft: number } | null;
 }
 
 export interface Settings {
   publicBaseUrl: string | null;
   publicBaseUrlFromEnv: boolean;
-  /** When the current URL last passed a check; survives restarts, unlike publicUrlCheck. */
   publicUrlVerifiedAt: string | null;
   invocationName: string;
   preset: Preset;
@@ -57,10 +70,8 @@ export interface StatusResponse {
   publicUrlCheck: PublicUrlResult | null;
   receivers: ReceiverView[];
   publicRequests: RequestRecord[];
-  /** The skill's playback reports ("Alexa, stop", the Echo's buffer). */
   skillReports: {
     lastSecondsAgo: number | null;
-    /** An Echo played, but no report came: the skill code predates them. */
     missing: boolean;
   };
 }
@@ -77,7 +88,17 @@ export interface SkillResponse {
   interactionModel: string;
 }
 
-export type SettingsUpdate = Partial<Pick<Settings, "invocationName" | "preset" | "idleTimeoutSeconds" | "forwardVolume" | "catchUp" | "restrictToHomeIp">> & {
+export type SettingsUpdate = Partial<
+  Pick<
+    Settings,
+    | "invocationName"
+    | "preset"
+    | "idleTimeoutSeconds"
+    | "forwardVolume"
+    | "catchUp"
+    | "restrictToHomeIp"
+  >
+> & {
   publicBaseUrl?: string | null;
 };
 

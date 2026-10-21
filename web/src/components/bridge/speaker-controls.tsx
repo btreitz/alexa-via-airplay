@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useBridge } from "@/hooks/use-bridge";
 import { useSyncedState } from "@/hooks/use-synced-state";
 import { api, type ReceiverView } from "@/lib/api";
-import { TEST_SECONDS, TEST_VOLUME } from "@bridge/bridge/speaker-test.ts";
+import { TEST_SECONDS, TEST_VOLUME } from "@bridge/bridge/constants.ts";
 
 /** Runs an API action for one Echo, with a busy flag to disable its controls meanwhile. */
 export function useSpeakerAction() {

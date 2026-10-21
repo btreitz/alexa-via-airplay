@@ -3,11 +3,16 @@ import { test } from "node:test";
 import crypto from "node:crypto";
 import vm from "node:vm";
 import { verifyEventSignature, verifySignature } from "../../src/public/signing.ts";
-import { interactionModel, launchPhrase, normalizeBaseUrl, skillIndexJs, validateInvocationName } from "../../src/alexa/skill.ts";
+import { skillIndexJs } from "../../src/alexa/skill/index-js.ts";
+import { interactionModel } from "../../src/alexa/skill/interaction-model.ts";
+import {
+  launchPhrase,
+  normalizeBaseUrl,
+  validateInvocationName,
+} from "../../src/alexa/skill/validation.ts";
 
 const options = { publicBaseUrl: "https://bridge.example.com/", secret: 'abc"def\\x', invocationName: "my sound bridge" };
 
-/** Loads the generated code with a fake https that records the skill's reports. */
 function loadSkill(source: string, { fail = false } = {}) {
   const module = { exports: {} as any };
   const reports: { url: string; method: string }[] = [];
@@ -40,7 +45,6 @@ test("generated skill code avoids syntax the console rejects", () => {
   const source = skillIndexJs(options);
   assert.doesNotMatch(source, /\?\.|\?\?/);
   assert.doesNotMatch(source, /\bimport\b/);
-  // Only Node's built-ins; no packages to install in the console.
   assert.deepEqual(source.match(/require\([^)]*\)/g), ['require("crypto")', 'require("https")']);
 });
 
@@ -54,13 +58,13 @@ test("launch plays a signed, short-lived URL the bridge accepts", async () => {
   assert.equal(url.origin + url.pathname, "https://bridge.example.com/play.mp3");
   assert.equal(url.searchParams.get("d"), "AMUJQV4RH4RIXMV5");
   assert.equal(url.searchParams.get("k"), null);
-  assert.doesNotMatch(directive.audioItem.stream.url, /abc/); // the secret is never in the URL
+  assert.doesNotMatch(directive.audioItem.stream.url, /abc/);
   const exp = Number(url.searchParams.get("exp"));
   const nowSeconds = Math.floor(Date.now() / 1000);
   assert.ok(exp > nowSeconds && exp <= nowSeconds + 61);
   const verdict = verifySignature(options.secret, url.searchParams.get("d"), url.searchParams.get("exp"), url.searchParams.get("sig"), nowSeconds);
   assert.deepEqual(verdict, { ok: true });
-  assert.equal(reports.length, 0); // the bridge started it; nothing to report
+  assert.equal(reports.length, 0);
 });
 
 test("resume and the play button get a fresh URL each time, after reporting it", async () => {
@@ -94,7 +98,6 @@ test("stop, pause and audio events are reported, signed for reports only", async
     assert.equal(url.origin + url.pathname, "https://bridge.example.com/play.mp3");
     const [d, e, exp, sig] = ["d", "e", "exp", "sig"].map((k) => url.searchParams.get(k));
     assert.deepEqual(verifyEventSignature(options.secret, e, d, exp, sig, nowSeconds), { ok: true });
-    // A report's signature doesn't make a stream URL.
     assert.equal(verifySignature(options.secret, d, exp, sig, nowSeconds).ok, false);
   }
 });

@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BYTES_PER_SECOND } from "../../src/airplay/audio.ts";
-import { CATCH_UP_MARGIN_SECONDS, EchoBuffer, isQuiet, MAX_START_BUFFER_SECONDS, PcmHistory, REPORT_DELAY_SECONDS } from "../../src/airplay/echo-buffer.ts";
+import {
+  BYTES_PER_SECOND,
+  CATCH_UP_MARGIN_SECONDS,
+  MAX_START_BUFFER_SECONDS,
+  REPORT_DELAY_SECONDS,
+} from "../../src/airplay/constants.ts";
+import { EchoBuffer } from "../../src/airplay/echo-buffer.ts";
+import { isQuiet } from "../../src/airplay/pcm.ts";
+import { PcmHistory } from "../../src/airplay/pcm-history.ts";
 
 const seconds = (s: number, value = 0) => {
   const buffer = Buffer.alloc(Math.round((s * BYTES_PER_SECOND) / 4) * 4);
@@ -31,8 +38,8 @@ test("history keeps the newest audio up to its limit", () => {
   assert.ok(history.bytes <= 3 * BYTES_PER_SECOND);
   const latest = history.latest(1.5);
   assert.equal(latest.length, Math.floor((1.5 * BYTES_PER_SECOND) / 4) * 4);
-  assert.equal(latest.readInt16LE(latest.length - 2), 4); // ends with the newest chunk
-  assert.equal(history.latest(10).length, history.bytes); // never more than there is
+  assert.equal(latest.readInt16LE(latest.length - 2), 4);
+  assert.equal(history.latest(10).length, history.bytes);
   history.clear();
   assert.equal(history.latest(1).length, 0);
 });
@@ -40,7 +47,7 @@ test("history keeps the newest audio up to its limit", () => {
 test("the first start teaches the pre-buffer; later connections get it as a burst", () => {
   const c = clock();
   const echo = new EchoBuffer(c.now);
-  assert.equal(echo.connect(), 0); // nothing learned yet: no burst
+  assert.equal(echo.connect(), 0);
   for (let i = 0; i < 30; i++) {
     echo.sent(loud(0.1).length);
     c.advance(100);
@@ -65,7 +72,7 @@ test("a start with enough burst keeps the estimate; one that waited raises it", 
 
   echo.connect();
   echo.sent(seconds(2).length, true);
-  c.advance(1500); // the Echo waited for more
+  c.advance(1500);
   echo.sent(seconds(1.5).length);
   echo.started();
   assert.equal(echo.startBufferSeconds, 3.5 - REPORT_DELAY_SECONDS);
@@ -82,16 +89,15 @@ test("catch-up leaves out audio only once the Echo plays and holds more than the
   const echo = new EchoBuffer(c.now);
   echo.connect();
   echo.sent(seconds(4).length, true);
-  assert.equal(echo.skip(quiet(0.1), "quiet"), false); // not playing yet: what it holds is unknown
+  assert.equal(echo.skip(quiet(0.1), "quiet"), false);
   echo.started();
   assert.equal(echo.buffered(), 4);
 
   assert.equal(echo.skip(quiet(0.1), "off"), false);
-  assert.equal(echo.skip(loud(0.1), "quiet"), false); // music stays in quiet mode
+  assert.equal(echo.skip(loud(0.1), "quiet"), false);
   assert.equal(echo.skip(quiet(0.1), "quiet"), true);
   assert.equal(echo.skip(loud(0.1), "skip"), true);
 
-  // Played down to the margin: everything is sent again.
   c.advance((4 - CATCH_UP_MARGIN_SECONDS) * 1000);
   assert.equal(echo.skip(quiet(0.1), "quiet"), false);
   assert.equal(echo.skip(loud(0.1), "skip"), false);

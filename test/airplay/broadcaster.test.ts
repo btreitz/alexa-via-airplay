@@ -5,15 +5,14 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { after, test } from "node:test";
-import type { CatchUp } from "../../src/airplay/echo-buffer.ts";
+import type { CatchUp } from "../../src/airplay/types.ts";
 
-// A stand-in encoder that passes PCM through unchanged, so the test can see
-// exactly which audio reached the Echo.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "avb-encoder-"));
 const encoder = path.join(dir, "encoder.sh");
 fs.writeFileSync(encoder, "#!/bin/sh\nexec cat\n", { mode: 0o755 });
 process.env.FFMPEG_PATH = encoder;
-const { BYTES_PER_SECOND, Mp3Broadcaster } = await import("../../src/airplay/audio.ts");
+const { BYTES_PER_SECOND } = await import("../../src/airplay/constants.ts");
+const { Mp3Broadcaster } = await import("../../src/airplay/mp3-broadcaster.ts");
 after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 class FakeInput extends EventEmitter {
@@ -36,7 +35,6 @@ function listen(stream: InstanceType<typeof Mp3Broadcaster>) {
   const received: Buffer[] = [];
   res.on("data", (chunk: Buffer) => received.push(chunk));
   stream.add(res, { remote: null, userAgent: null });
-  // Only the audible part: silence filler starts whenever the fake input pauses.
   const audio = () => {
     const all = Buffer.concat(received);
     const frames: Buffer[] = [];
@@ -46,7 +44,6 @@ function listen(stream: InstanceType<typeof Mp3Broadcaster>) {
   return { res, audio };
 }
 
-/** Waits until the stand-in encoder has passed `bytes` of audio through (or 3 s), then a moment more. */
 async function settle(audio: () => Buffer, bytes: number) {
   for (const end = Date.now() + 3000; audio().length < bytes && Date.now() < end; ) await new Promise((r) => setTimeout(r, 20));
   await new Promise((r) => setTimeout(r, 100));
@@ -58,7 +55,7 @@ test("a new Echo gets the latest audio of this play run as its start burst", asy
   const stream = new Mp3Broadcaster("t", input as never);
   try {
     stream.echo.startBufferSeconds = 1;
-    input.play(2, 1); // before a pause: not part of this play run
+    input.play(2, 1);
     input.lastDataAt = 0;
     input.play(1, 2);
     input.play(1, 3);
@@ -66,9 +63,9 @@ test("a new Echo gets the latest audio of this play run as its start burst", asy
     await settle(echo.audio, second(1));
     const burst = echo.audio();
     assert.equal(burst.length, second(1));
-    assert.equal(burst.readInt16LE(0), 3000); // the newest second
+    assert.equal(burst.readInt16LE(0), 3000);
     assert.equal(stream.echo.status().lastStart, null);
-    input.play(0.5, 4); // live audio follows
+    input.play(0.5, 4);
     await settle(echo.audio, second(1.5));
     assert.equal(echo.audio().length, second(1.5));
   } finally {
@@ -84,14 +81,14 @@ test("catch-up leaves audio out only while the Echo holds more than the margin",
     stream.echo.startBufferSeconds = 3;
     input.play(3, 1);
     const echo = listen(stream);
-    input.play(0.5, 2); // before the Echo reported a start: always sent
+    input.play(0.5, 2);
     await settle(echo.audio, second(3.5));
     assert.equal(echo.audio().length, second(3.5));
     const start = stream.echoStarted();
     assert.equal(start.burstSeconds, 3);
-    input.play(0.5, 3); // holds ~3.5 s, margin 1.5 s: left out
+    input.play(0.5, 3);
     mode = "quiet";
-    input.play(0.5, 4); // music in quiet mode: sent
+    input.play(0.5, 4);
     mode = "off";
     input.play(0.5, 5);
     await settle(echo.audio, second(4.5));

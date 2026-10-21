@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { ClientIpResolver } from "../../src/public/client-ip.ts";
-import { DeviceMapper } from "../../src/bridge/device-map.ts";
-import { HomeIpMonitor } from "../../src/public/home-ip.ts";
-import { PublicServer } from "../../src/public/server.ts";
-import { checkPublicUrl, describeFetchError } from "../../src/public/url-check.ts";
+import { ClientIpResolver } from "../../src/public/client-ip-resolver.ts";
+import { DeviceMapper } from "../../src/bridge/device-mapper.ts";
+import { HomeIpMonitor } from "../../src/public/home-ip-monitor.ts";
+import { PublicServer } from "../../src/public/public-server.ts";
+import { describeFetchError } from "../../src/public/fetch-errors.ts";
+import { checkPublicUrl } from "../../src/public/url-check.ts";
 import { tempStore } from "../helpers.ts";
 
 const store = tempStore();
@@ -33,7 +34,7 @@ test("probe that reaches the bridge, client IP matching the home", async () => {
   assert.equal(result.ok, true);
   assert.equal(result.clientIp, "127.0.0.1");
   assert.equal(result.homeIpMatch, true);
-  assert.equal(result.url, `${base}/play.mp3`); // the nonce isn't shown
+  assert.equal(result.url, `${base}/play.mp3`);
 });
 
 test("probe arrives but the client IP doesn't look like home", async () => {
@@ -48,7 +49,6 @@ test("probe arrives but the client IP doesn't look like home", async () => {
 test("something else answering is not the bridge", async () => {
   const other = new PublicServer({ ...(server as any).deps });
   await other.listen(0, "127.0.0.1");
-  // Requests go to `other`, but we wait for the probe on `server`.
   const result = await checkPublicUrl(`http://127.0.0.1:${other.address!.port}`, server, homeIp("127.0.0.1"));
   await other.close();
   assert.equal(result.ok, false);

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { defaultReceiverName, nextFreePort, validateReceiverName } from "../../src/bridge/bridge.ts";
-import { airplayDeviceIdFor, receiverId, shairportConfig } from "../../src/airplay/receiver.ts";
+import { airplayDeviceIdFor, receiverId } from "../../src/airplay/receiver-ids.ts";
+import { shairportConfig } from "../../src/airplay/shairport-config.ts";
+import {
+  defaultReceiverName,
+  nextFreePort,
+  validateReceiverName,
+} from "../../src/bridge/receiver-names.ts";
 
 const entry = { serial: "G0922J0624471P3C", name: 'Bath "room"', port: 7001, airplayDeviceId: airplayDeviceIdFor("G0922J0624471P3C") };
 
@@ -11,7 +16,7 @@ test("receiver IDs and AirPlay device IDs are stable and well-formed", () => {
   assert.match(id, /^[0-9A-F]{12}$/);
   assert.equal(id, airplayDeviceIdFor("G0922J0624471P3C"));
   assert.notEqual(id, airplayDeviceIdFor("G2A1A60304840BMT"));
-  assert.equal(parseInt(id.slice(0, 2), 16) & 0x03, 0x02); // locally administered, unicast
+  assert.equal(parseInt(id.slice(0, 2), 16) & 0x03, 0x02);
 });
 
 test("shairport config escapes the name and sets per-instance values", () => {
@@ -24,7 +29,7 @@ test("shairport config escapes the name and sets per-instance values", () => {
   assert.doesNotMatch(conf, /mqtt/);
   const withMqtt = shairportConfig({ entry, fifo: "/p", mqtt: { port: 1883, topic: "t/x" } });
   assert.match(withMqtt, /enable_remote = "yes";/);
-  assert.match(withMqtt, /publish_raw = "yes";/); // for "pres", the play-pressed signal
+  assert.match(withMqtt, /publish_raw = "yes";/);
 });
 
 test("ports and names", () => {

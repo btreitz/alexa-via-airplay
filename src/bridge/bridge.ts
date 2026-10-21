@@ -1,51 +1,30 @@
-// Ties everything together: keeps one receiver per selected Echo running,
-// triggers Echos through Alexa and learns their device IDs.
-
 import { EventEmitter } from "node:events";
-import { AlexaController } from "../alexa/controller.ts";
-import { hostNetworkCheck, mdnsCheck, ptpPortsCheck, type Check } from "../airplay/host-checks.ts";
-import { ClientIpResolver } from "../public/client-ip.ts";
-import { dataPath, type Config } from "../config.ts";
-import { DeviceMapper, LEARN_WINDOW_MS } from "./device-map.ts";
-import { errorMessage, logger } from "../lib/log.ts";
-import { airplayDeviceIdFor, Receiver, receiverId, type ReceiverStatus } from "../airplay/receiver.ts";
-import { HomeIpMonitor } from "../public/home-ip.ts";
+import { runHostChecks } from "../airplay/host-checks.ts";
+import type { Receiver } from "../airplay/receiver.ts";
+import { airplayDeviceIdFor } from "../airplay/receiver-ids.ts";
+import { SystemServices } from "../airplay/system-services.ts";
+import type { Check } from "../airplay/types.ts";
+import { AlexaController } from "../alexa/alexa-controller.ts";
+import { launchPhrase } from "../alexa/skill/validation.ts";
+import { dataPath } from "../config/config.ts";
+import { ALEXA_SESSION_FILE, STATE_FILE } from "../config/constants.ts";
+import type { Config } from "../config/types.ts";
+import { logger } from "../lib/log.ts";
+import { waitFor } from "../lib/time.ts";
+import { ClientIpResolver } from "../public/client-ip-resolver.ts";
+import { HomeIpMonitor } from "../public/home-ip-monitor.ts";
+import type { PublicUrlResult, SkillEvent } from "../public/types.ts";
+import { StateStore } from "../state/state-store.ts";
+import type { ReceiverEntry } from "../state/types.ts";
 import type { ReceiverView } from "../ui/api-types.ts";
-import type { PublicUrlResult } from "../public/url-check.ts";
-import type { SessionManager } from "./session.ts";
-import { launchPhrase } from "../alexa/skill.ts";
-import type { SkillEvent } from "../public/signing.ts";
-import { StateStore, type ReceiverEntry } from "../state.ts";
-import { TEST_SECONDS, TEST_VOLUME } from "./speaker-test.ts";
-import { SystemServices, waitFor } from "../airplay/system-services.ts";
-
-const log = logger("bridge");
-/** After a trigger, the Echo may connect for this long even without an AirPlay session. */
-export const TRIGGER_GRACE_MS = 20_000;
-/** A stop the skill reports this soon after the bridge stopped the Echo is that stop. */
-const OWN_STOP_MS = 10_000;
-
-export function defaultReceiverName(echoName: string): string {
-  return `${echoName} (Alexa)`;
-}
-
-export function nextFreePort(used: number[], base: number): number {
-  let port = base;
-  while (used.includes(port)) port++;
-  return port;
-}
-
-export function validateReceiverName(input: string): string {
-  const name = input.trim().replace(/\s+/g, " ");
-  if (!name || name.length > 50) throw new Error("The AirPlay name must be 1–50 characters");
-  if (/[\p{Cc}"\\]/u.test(name)) throw new Error("The AirPlay name must not contain quotes, backslashes or control characters");
-  return name;
-}
-
-export interface MqttSettings {
-  port: number;
-  topicFor: (receiverId: string) => string;
-}
+import { LEARN_WINDOW_MS, MAPPING_POLL_MS, OWN_STOP_MS, TRIGGER_GRACE_MS } from "./constants.ts";
+import { DeviceMapper } from "./device-mapper.ts";
+import { ReceiverPool } from "./receiver-pool.ts";
+import { defaultReceiverName, nextFreePort, validateReceiverName } from "./receiver-names.ts";
+import { receiverViews } from "./receiver-views.ts";
+import type { SessionManager } from "./session/session-manager.ts";
+import { SpeakerTests } from "./speaker-tests.ts";
+import type { MqttSettings } from "./types.ts";
 
 export class Bridge extends EventEmitter {
   readonly config: Config;
@@ -55,44 +34,48 @@ export class Bridge extends EventEmitter {
   readonly system?: SystemServices;
   readonly homeIp: HomeIpMonitor;
   readonly clientIp: ClientIpResolver;
-  private readonly lastTriggerAt = new Map<string, number>();
-  private readonly lastStopAt = new Map<string, number>();
-  private readonly tests = new Map<string, { endsAt: number; timer: NodeJS.Timeout }>();
-  private readonly receivers = new Map<string, Receiver>();
-  private reconciling: Promise<void> = Promise.resolve();
   mqtt?: MqttSettings;
   sessions?: SessionManager;
-  /** Results of the startup checks, shown in the UI. */
   checks: Check[] = [];
   publicUrlCheck: PublicUrlResult | null = null;
+  private readonly log = logger("bridge");
+  private readonly receivers: ReceiverPool;
+  private readonly tests: SpeakerTests;
+  private readonly lastTriggerAt = new Map<string, number>();
+  private readonly lastStopAt = new Map<string, number>();
 
   constructor(config: Config) {
     super();
     this.config = config;
-    this.store = new StateStore(dataPath(config, "state.json"));
-    this.alexa = new AlexaController(dataPath(config, "alexa-session.json"));
+    this.store = new StateStore(dataPath(config, STATE_FILE));
+    this.alexa = new AlexaController(dataPath(config, ALEXA_SESSION_FILE));
     this.mapper = new DeviceMapper(this.store);
-    if (config.manageReceivers) this.system = new SystemServices(config.runDir, config.avahiInterfaces);
+    if (config.manageReceivers) {
+      this.system = new SystemServices(config.runDir, config.avahiInterfaces);
+    }
     this.homeIp = new HomeIpMonitor({
       traceUrl: config.publicIpTraceUrl,
       refreshSeconds: config.publicIpRefreshSeconds,
       ipv6PrefixLength: config.ipv6PrefixLength,
     });
-    this.clientIp = new ClientIpResolver({ header: config.clientIpHeader, trustedProxies: config.trustedProxies });
-  }
-
-  /** Host checks that must run before NQPTP and Avahi take the ports. */
-  private async runHostChecks(): Promise<void> {
-    if (!this.config.manageReceivers) return;
-    this.checks = [hostNetworkCheck(), await ptpPortsCheck(), await mdnsCheck()];
-    for (const check of this.checks) (check.ok ? log.info : log.warn)(`check ${check.name}: ${check.message}`);
-  }
-
-  /** Whether the Echo may stream without an AirPlay session: just triggered, or under test. */
-  recentlyTriggered(serial: string): boolean {
-    if (this.tests.has(serial)) return true;
-    const at = this.lastTriggerAt.get(serial);
-    return at !== undefined && Date.now() - at <= TRIGGER_GRACE_MS;
+    this.clientIp = new ClientIpResolver({
+      header: config.clientIpHeader,
+      trustedProxies: config.trustedProxies,
+    });
+    this.receivers = new ReceiverPool({
+      runDir: config.runDir,
+      runShairport: config.manageReceivers,
+      mqtt: () => this.mqtt,
+      catchUp: () => this.store.get().catchUp,
+      onAdded: (receiver) => this.emit("receiver-added", receiver),
+      onRemoved: (receiver) => this.emit("receiver-removed", receiver),
+    });
+    this.tests = new SpeakerTests({
+      receiver: (serial) => this.receiverBySerial(serial),
+      setVolume: (serial, volume) => this.alexa.setVolume(serial, volume),
+      trigger: (serial) => this.triggerEcho(serial),
+      stopEcho: (serial) => this.stopEcho(serial),
+    });
   }
 
   get publicBaseUrl(): string | undefined {
@@ -100,81 +83,60 @@ export class Bridge extends EventEmitter {
   }
 
   async start(): Promise<void> {
-    // Not awaited: an unreachable trace endpoint must not block startup (requests fail closed meanwhile).
     void this.homeIp.start();
-    await this.runHostChecks();
+    if (this.config.manageReceivers) await this.checkHost();
     await this.system?.start();
     await this.reconcile();
-    await this.alexa.resume(this.store.get().amazonPage);
+    this.alexa.resume(this.store.get().amazonPage);
   }
 
   async stop(): Promise<void> {
     this.homeIp.stop();
     this.alexa.shutdown();
-    await Promise.all([...this.receivers.values()].map((r) => r.stop()));
-    this.receivers.clear();
+    await this.receivers.stopAll();
     await this.system?.stop();
   }
 
   receiverBySerial(serial: string): Receiver | undefined {
-    return this.receivers.get(receiverId(serial));
+    return this.receivers.bySerial(serial);
   }
 
   receiverById(id: string): Receiver | undefined {
-    return this.receivers.get(id);
+    return this.receivers.byId(id);
   }
 
   allReceivers(): Receiver[] {
-    return [...this.receivers.values()];
+    return this.receivers.all();
   }
 
-  /** Starts, updates or stops receivers so they match the stored selection. */
   reconcile(): Promise<void> {
-    this.reconciling = this.reconciling.then(() => this.doReconcile()).catch((err) => {
-      log.error("reconcile failed", { error: errorMessage(err) });
-    });
-    return this.reconciling;
+    return this.receivers.reconcile(this.store.get().receivers);
   }
 
-  private async doReconcile(): Promise<void> {
-    const wanted = new Map(this.store.get().receivers.map((e) => [receiverId(e.serial), e]));
-    for (const [id, receiver] of this.receivers) {
-      if (!wanted.has(id)) {
-        log.info("removing receiver", { id, name: receiver.entry.name });
-        await receiver.stop();
-        this.receivers.delete(id);
-        this.emit("receiver-removed", receiver);
-      }
-    }
-    for (const [id, entry] of wanted) {
-      const existing = this.receivers.get(id);
-      if (existing) {
-        await existing.update(entry);
-        continue;
-      }
-      log.info("adding receiver", { id, name: entry.name, port: entry.port });
-      const receiver = new Receiver({
-        entry,
-        runDir: this.config.runDir,
-        runShairport: this.config.manageReceivers,
-        mqtt: this.mqtt ? { port: this.mqtt.port, topic: this.mqtt.topicFor(id) } : undefined,
-        catchUp: () => this.store.get().catchUp,
-      });
-      receiver.start();
-      this.receivers.set(id, receiver);
-      this.emit("receiver-added", receiver);
-    }
+  recentlyTriggered(serial: string): boolean {
+    if (this.tests.has(serial)) return true;
+    const at = this.lastTriggerAt.get(serial);
+    return at !== undefined && Date.now() - at <= TRIGGER_GRACE_MS;
+  }
+
+  testing(serial: string): boolean {
+    return this.tests.has(serial);
+  }
+
+  allowStream(serial: string): void {
+    this.lastTriggerAt.set(serial, Date.now());
   }
 
   async addReceiver(serial: string, name?: string): Promise<ReceiverEntry> {
-    const device = this.alexa.devices().find((d) => d.serial === serial);
     const existing = this.store.get().receivers.find((r) => r.serial === serial);
     if (existing) return existing;
+    const device = this.alexa.devices().find((d) => d.serial === serial);
     if (!device) throw new Error("Unknown Echo. Sign in to Amazon and refresh the device list.");
+    const usedPorts = this.store.get().receivers.map((r) => r.port);
     const entry: ReceiverEntry = {
       serial,
       name: validateReceiverName(name || defaultReceiverName(device.name)),
-      port: nextFreePort(this.store.get().receivers.map((r) => r.port), this.config.airplayBasePort),
+      port: nextFreePort(usedPorts, this.config.airplayBasePort),
       airplayDeviceId: airplayDeviceIdFor(serial),
     };
     this.store.update((s) => {
@@ -201,124 +163,80 @@ export class Bridge extends EventEmitter {
     await this.reconcile();
   }
 
-  /**
-   * Starts the skill on one Echo. While an Echo isn't mapped yet, only one
-   * unmapped trigger runs at a time, so the next unknown `d` is unambiguous.
-   */
   async triggerEcho(serial: string): Promise<{ mapped: boolean }> {
-    if (!this.mapper.isMapped(serial)) {
-      const free = await waitFor(() => this.mapper.pendingUnmapped().every((s) => s === serial), LEARN_WINDOW_MS, 250);
-      if (!free) throw new Error("Another Echo is still being mapped; try again in a few seconds");
-    }
+    if (!this.mapper.isMapped(serial)) await this.waitForMappingTurn(serial);
     this.mapper.noteTrigger(serial);
     this.lastTriggerAt.set(serial, Date.now());
     const phrase = launchPhrase(this.store.get().invocationName);
-    log.info("triggering Echo", { serial, phrase });
+    this.log.info("triggering Echo", { serial, phrase });
     await this.alexa.textCommand(serial, phrase);
     return { mapped: this.mapper.isMapped(serial) };
   }
 
-  /**
-   * Plays the chime on one Echo for TEST_SECONDS, through the same path as
-   * AirPlay audio (skill, public URL, stream), so it proves the whole chain.
-   */
-  async startTest(serial: string): Promise<{ endsAt: number }> {
-    const receiver = this.receiverBySerial(serial);
-    if (!receiver) throw new Error("Not a receiver");
-    if (receiver.input.active) throw new Error("AirPlay is playing on this speaker; the test would interrupt it");
-    this.endTest(serial);
-    receiver.stream.startTone();
-    const endsAt = Date.now() + TEST_SECONDS * 1000;
-    const timer = setTimeout(() => {
-      // If AirPlay took over meanwhile, leave the Echo playing it.
-      const takenOver = this.receiverBySerial(serial)?.input.active;
-      this.endTest(serial);
-      if (!takenOver) this.stopEcho(serial).catch((err) => log.warn("stopping after the test failed", { serial, error: errorMessage(err) }));
-    }, TEST_SECONDS * 1000);
-    this.tests.set(serial, { endsAt, timer });
-    log.info("speaker test", { serial, seconds: TEST_SECONDS, volume: TEST_VOLUME });
-    try {
-      await this.alexa.setVolume(serial, TEST_VOLUME);
-      await this.triggerEcho(serial);
-    } catch (err) {
-      this.endTest(serial);
-      throw err;
-    }
-    return { endsAt };
-  }
-
-  testing(serial: string): boolean {
-    return this.tests.has(serial);
-  }
-
-  private endTest(serial: string): void {
-    const test = this.tests.get(serial);
-    if (!test) return;
-    clearTimeout(test.timer);
-    this.tests.delete(serial);
-    this.receiverBySerial(serial)?.stream.stopTone();
-  }
-
-  /** Lets an Echo connect without a trigger from the bridge, e.g. resumed on the Echo itself. */
-  allowStream(serial: string): void {
-    this.lastTriggerAt.set(serial, Date.now());
-  }
-
-  /** A playback report from the skill (public/server.ts). */
-  skillReport(serial: string, event: SkillEvent): void {
-    const receiver = this.receiverBySerial(serial);
-    if (!receiver) return;
-    if (event === "started") {
-      const start = receiver.stream.echoStarted();
-      log.info("Echo started playing", {
-        receiver: receiver.id,
-        afterMs: start.waitedMs,
-        audioSeconds: start.audioSeconds,
-        burstSeconds: start.burstSeconds,
-        startBufferSeconds: receiver.stream.echo.startBufferSeconds,
-      });
-      return;
-    }
-    if (event === "paused" || event === "stopped") {
-      const stoppedAt = this.lastStopAt.get(serial);
-      if (stoppedAt !== undefined && Date.now() - stoppedAt < OWN_STOP_MS) return;
-      if (this.tests.has(serial)) {
-        log.info("speaker test stopped on the Echo", { serial });
-        this.endTest(serial);
-        receiver.stream.dropAll();
-        return;
-      }
-    }
-    this.sessions?.onSkillEvent(receiver.id, event);
+  startTest(serial: string): Promise<{ endsAt: number }> {
+    return this.tests.start(serial);
   }
 
   async stopEcho(serial: string): Promise<void> {
     this.lastStopAt.set(serial, Date.now());
-    this.endTest(serial);
-    log.info("stopping Echo", { serial });
+    this.tests.end(serial);
+    this.log.info("stopping Echo", { serial });
     await this.alexa.stopPlayback(serial);
-    // A stopped Echo keeps its connection open for about a minute; end it now
-    // so the stream doesn't keep running for nobody.
     this.receiverBySerial(serial)?.stream.dropAll();
   }
 
+  skillReport(serial: string, event: SkillEvent): void {
+    const receiver = this.receiverBySerial(serial);
+    if (!receiver) return;
+    if (event === "started") return this.onEchoStarted(receiver);
+    if ((event === "paused" || event === "stopped") && this.handledStop(serial, receiver)) return;
+    this.sessions?.onSkillEvent(receiver.id, event);
+  }
+
   receiverStatuses(): ReceiverView[] {
-    const devices = new Map(this.alexa.devices().map((d) => [d.serial, d]));
-    return this.store.get().receivers.map((entry) => {
-      const receiver = this.receivers.get(receiverId(entry.serial));
-      const device = devices.get(entry.serial);
-      const base: ReceiverStatus = receiver
-        ? receiver.status()
-        : { id: receiverId(entry.serial), serial: entry.serial, name: entry.name, port: entry.port, process: null, audio: { active: false, secondsTotal: 0, lastAudioSecondsAgo: null, levelDb: null }, listeners: [], echo: { startBufferSeconds: null, bufferedSeconds: null, lastStart: null, skippedSeconds: 0 } };
-      return {
-        ...base,
-        mapped: this.mapper.isMapped(entry.serial),
-        echoName: device?.name,
-        echoModel: device?.model,
-        echoOnline: device?.online,
-        session: this.sessions?.snapshot(base.id) ?? null,
-        test: this.tests.has(entry.serial) ? { secondsLeft: Math.max(0, Math.ceil((this.tests.get(entry.serial)!.endsAt - Date.now()) / 1000)) } : null,
-      };
+    return receiverViews(this.store.get().receivers, {
+      receiver: (serial) => this.receiverBySerial(serial),
+      devices: this.alexa.devices(),
+      isMapped: (serial) => this.mapper.isMapped(serial),
+      session: (id) => this.sessions?.snapshot(id) ?? null,
+      testSecondsLeft: (serial) => this.tests.secondsLeft(serial),
     });
+  }
+
+  private async checkHost(): Promise<void> {
+    this.checks = await runHostChecks();
+    for (const check of this.checks) {
+      (check.ok ? this.log.info : this.log.warn)(`check ${check.name}: ${check.message}`);
+    }
+  }
+
+  private async waitForMappingTurn(serial: string): Promise<void> {
+    const free = await waitFor(
+      () => this.mapper.pendingUnmapped().every((s) => s === serial),
+      LEARN_WINDOW_MS,
+      MAPPING_POLL_MS,
+    );
+    if (!free) throw new Error("Another Echo is still being mapped; try again in a few seconds");
+  }
+
+  private onEchoStarted(receiver: Receiver): void {
+    const start = receiver.stream.echoStarted();
+    this.log.info("Echo started playing", {
+      receiver: receiver.id,
+      afterMs: start.waitedMs,
+      audioSeconds: start.audioSeconds,
+      burstSeconds: start.burstSeconds,
+      startBufferSeconds: receiver.stream.echo.startBufferSeconds,
+    });
+  }
+
+  private handledStop(serial: string, receiver: Receiver): boolean {
+    const stoppedAt = this.lastStopAt.get(serial);
+    if (stoppedAt !== undefined && Date.now() - stoppedAt < OWN_STOP_MS) return true;
+    if (!this.tests.has(serial)) return false;
+    this.log.info("speaker test stopped on the Echo", { serial });
+    this.tests.end(serial);
+    receiver.stream.dropAll();
+    return true;
   }
 }

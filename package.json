@@ -13,8 +13,10 @@
     "dev:web": "pnpm --filter @alexa-via-airplay/web dev",
     "typecheck": "tsc && pnpm --filter @alexa-via-airplay/web typecheck",
     "test": "LOG_LEVEL=error node --disable-warning=ExperimentalWarning --test 'test/**/*.test.ts'",
-    "check": "pnpm typecheck && pnpm lint && pnpm test",
-    "lint": "eslint . && pnpm --filter @alexa-via-airplay/web lint"
+    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
+    "lint": "eslint . && pnpm --filter @alexa-via-airplay/web lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "aedes": "^1.2.0",
@@ -24,7 +26,10 @@
     "@eslint/js": "^9.39.5",
     "@types/node": "^22.18.0",
     "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "typescript": "^5.9.0",
     "typescript-eslint": "~8.71.2"
   },

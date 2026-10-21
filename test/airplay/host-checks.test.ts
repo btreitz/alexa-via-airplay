@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import dgram from "node:dgram";
 import { test } from "node:test";
-import { hostNetworkCheck, udpPortFree } from "../../src/airplay/host-checks.ts";
+import { hostNetworkCheck } from "../../src/airplay/host-checks.ts";
+import { udpPortFree } from "../../src/airplay/udp-port.ts";
 
 test("detects an occupied UDP port", async () => {
   const socket = dgram.createSocket("udp4");

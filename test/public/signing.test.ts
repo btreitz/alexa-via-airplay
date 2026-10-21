@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CLOCK_SKEW_SECONDS, MAX_TTL_SECONDS, redactQuery, signature, signedQuery, verifySignature } from "../../src/public/signing.ts";
+import { CLOCK_SKEW_SECONDS, MAX_TTL_SECONDS } from "../../src/public/constants.ts";
+import { redactQuery } from "../../src/public/query.ts";
+import { signature, signedQuery, verifySignature } from "../../src/public/signing.ts";
 
 const secret = "test-secret-0123456789";
 const now = 1_800_000_000;
@@ -35,7 +37,6 @@ test("expiry with clock skew", () => {
   const q = signedQuery(secret, "D1234", now, 60);
   assert.equal(verify(q, now + 60 + CLOCK_SKEW_SECONDS).ok, true);
   assert.deepEqual(verify(q, now + 60 + CLOCK_SKEW_SECONDS + 1), { ok: false, reason: "expired" });
-  // A skill clock running a bit ahead is fine.
   assert.equal(verify(signedQuery(secret, "D1234", now + CLOCK_SKEW_SECONDS)).ok, true);
 });
 

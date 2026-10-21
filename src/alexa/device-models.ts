@@ -130,7 +130,6 @@ const MODELS: Record<string, string> = {
   AWZZ5CVHX2CD: "Echo Show (2nd gen)",
 };
 
-/** The model name for a device type code, or null if unknown. */
 export function modelName(deviceType: string): string | null {
   return MODELS[deviceType] ?? null;
 }
