@@ -33,7 +33,7 @@ export function Introduction() {
           <HowItWorks />
         </Section>
 
-        <Section title="What the setup needs" description="Four steps, about 20 minutes. You can leave and come back; the sidebar shows what's done.">
+        <Section title="What the setup needs">
           <ol className="divide-y rounded-lg border">
             {NEEDS.map(([title, text], i) => (
               <li key={title} className="flex gap-4 px-4 py-3">
