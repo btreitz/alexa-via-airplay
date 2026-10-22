@@ -105,8 +105,9 @@ export class PublicServer extends EventEmitter {
   private async handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const url = new URL(req.url || "/", "http://localhost");
     const onStreamPath = url.pathname === STREAM_PATH;
-    if (onStreamPath && this.probes.matches(url.searchParams.get("probe"))) {
-      this.probes.arrived(this.remoteOf(req));
+    const probe = onStreamPath ? this.probes.matching(url.searchParams.get("probe")) : null;
+    if (probe) {
+      this.probes.arrived(probe, this.remoteOf(req));
       return sendNotFound(res);
     }
     if (onStreamPath && req.method === "POST")

@@ -1,6 +1,6 @@
 import type { Writable } from "node:stream";
 import { logger, type Logger } from "../../../lib/log.ts";
-import { roundToTenth } from "../../../lib/time.ts";
+import { roundToTenth } from "../../../lib/numbers.ts";
 import { ENCODER_LINGER_MS, ENCODER_RESTART_DELAY_MS, RECONNECT_MS } from "../../constants.ts";
 import { EchoBuffer } from "../echo-buffer.ts";
 import { FillerSound } from "../filler/sound.ts";

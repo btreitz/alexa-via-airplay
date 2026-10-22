@@ -1,4 +1,4 @@
-import { roundToTenth } from "../../../lib/time.ts";
+import { roundToTenth } from "../../../lib/numbers.ts";
 import {
   FULL_SCALE,
   LEVEL_SAMPLE_STRIDE_BYTES,

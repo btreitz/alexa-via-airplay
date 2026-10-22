@@ -1,37 +1,32 @@
 import crypto from "node:crypto";
 
-interface PendingProbe {
-  nonce: string;
-  seen: (remote: string | null) => void;
-}
-
 export class ProbeWatcher {
-  private pending?: PendingProbe;
+  private readonly pending = new Map<string, (remote: string | null) => void>();
 
   expect(nonce: string, timeoutMs: number): Promise<{ remote: string | null } | null> {
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
-        this.pending = undefined;
+        this.pending.delete(nonce);
         resolve(null);
       }, timeoutMs);
-      this.pending = {
-        nonce,
-        seen: (remote) => {
-          clearTimeout(timer);
-          this.pending = undefined;
-          resolve({ remote });
-        },
-      };
+      this.pending.set(nonce, (remote) => {
+        clearTimeout(timer);
+        this.pending.delete(nonce);
+        resolve({ remote });
+      });
     });
   }
 
-  matches(probe: string | null): boolean {
-    const nonce = this.pending?.nonce;
-    if (!probe || !nonce || probe.length !== nonce.length) return false;
-    return crypto.timingSafeEqual(Buffer.from(probe), Buffer.from(nonce));
+  matching(probe: string | null): string | null {
+    if (!probe) return null;
+    for (const nonce of this.pending.keys()) {
+      if (probe.length !== nonce.length) continue;
+      if (crypto.timingSafeEqual(Buffer.from(probe), Buffer.from(nonce))) return nonce;
+    }
+    return null;
   }
 
-  arrived(remote: string | null): void {
-    this.pending?.seen(remote);
+  arrived(nonce: string, remote: string | null): void {
+    this.pending.get(nonce)?.(remote);
   }
 }

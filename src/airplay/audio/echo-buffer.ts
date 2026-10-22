@@ -1,5 +1,4 @@
-import { clamp } from "../../lib/numbers.ts";
-import { roundToTenth } from "../../lib/time.ts";
+import { clamp, roundToTenth } from "../../lib/numbers.ts";
 import {
   CATCH_UP_MARGIN_SECONDS,
   MAX_START_BUFFER_SECONDS,

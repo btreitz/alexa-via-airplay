@@ -235,8 +235,9 @@ export class Bridge extends EventEmitter {
     const base = this.publicBaseUrl;
     if (!base) throw new Error("Set the public base URL first");
     const result = await checkPublicUrl(base, publicServer, this.homeIp);
+    if (this.publicBaseUrl !== base) return result;
     this.urlCheck = result;
-    if (result.ok) {
+    if (result.ok && !this.store.get().publicUrlVerifiedAt) {
       this.store.update((s) => {
         s.publicUrlVerifiedAt = result.checkedAt;
       });

@@ -1,4 +1,4 @@
-import { SAMPLE_RATE, SHAIRPORT_NQPTP_NAME_MAX } from "../constants.ts";
+import { EVENT_BUS_HOST, SAMPLE_RATE, SHAIRPORT_NQPTP_NAME_MAX } from "../constants.ts";
 import { receiverId } from "./ids.ts";
 import type { MqttTarget, ShairportConfigOptions } from "../types.ts";
 
@@ -43,7 +43,7 @@ function mqttSections(mqtt: MqttTarget): string[] {
     "",
     "mqtt = {",
     '  enabled = "yes";',
-    '  hostname = "127.0.0.1";',
+    `  hostname = ${quote(EVENT_BUS_HOST)};`,
     `  port = ${mqtt.port};`,
     `  topic = ${quote(mqtt.topic)};`,
     '  publish_parsed = "yes";',

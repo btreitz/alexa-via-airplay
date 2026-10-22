@@ -9,6 +9,16 @@ function compile(pathPattern: string): { pattern: RegExp; keys: string[] } {
   return { pattern: new RegExp(`^${source}$`), keys };
 }
 
+function decodeParams(keys: string[], match: RegExpExecArray): Params | null {
+  const params: Params = {};
+  try {
+    keys.forEach((key, i) => (params[key] = decodeURIComponent(match[i + 1])));
+  } catch {
+    return null;
+  }
+  return params;
+}
+
 export class Router {
   private readonly routes: Route[] = [];
 
@@ -23,9 +33,8 @@ export class Router {
       if (!match) continue;
       pathMatched = true;
       if (route.method !== method) continue;
-      const params: Params = {};
-      route.keys.forEach((key, i) => (params[key] = decodeURIComponent(match[i + 1])));
-      return { route, params };
+      const params = decodeParams(route.keys, match);
+      return params ? { route, params } : undefined;
     }
     return pathMatched ? "method" : undefined;
   }

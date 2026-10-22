@@ -15,10 +15,6 @@ export async function waitFor(
   return check();
 }
 
-export function roundToTenth(value: number): number {
-  return Math.round(value * 10) / 10;
-}
-
 export function secondsSince(time: number, now = Date.now()): number {
   return Math.round((now - time) / 1000);
 }
