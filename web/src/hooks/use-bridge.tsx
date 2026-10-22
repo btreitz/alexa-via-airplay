@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
+import { errorMessage } from "@bridge/lib/errors.ts";
 import { api, type DeviceView, type StatusResponse } from "@/lib/api";
 import { DEVICES_EVERY_MS, POLL_MS } from "@/lib/constants";
 
@@ -22,10 +23,6 @@ interface BridgeContextValue {
 }
 
 const BridgeContext = createContext<BridgeContextValue | null>(null);
-
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 export function BridgeProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<StatusResponse | null>(null);
@@ -59,7 +56,7 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
         if (success) toast.success(success);
         return result;
       } catch (err) {
-        toast.error(errorText(err));
+        toast.error(errorMessage(err));
         return undefined;
       } finally {
         lastDevices.current.at = 0;

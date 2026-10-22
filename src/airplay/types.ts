@@ -1,3 +1,5 @@
+import type { ReceiverEntry } from "../state/types.ts";
+
 export type CatchUp = "off" | "quiet" | "skip";
 
 export interface StartMeasurement {
@@ -32,15 +34,8 @@ export interface MqttTarget {
   topic: string;
 }
 
-export interface ReceiverEntryLike {
-  serial: string;
-  name: string;
-  port: number;
-  airplayDeviceId: string;
-}
-
 export interface ShairportConfigOptions {
-  entry: ReceiverEntryLike;
+  entry: ReceiverEntry;
   fifo: string;
   mqtt?: MqttTarget;
 }
@@ -62,7 +57,7 @@ export interface ReceiverStatus {
 }
 
 export interface ReceiverOptions {
-  entry: ReceiverEntryLike;
+  entry: ReceiverEntry;
   runDir: string;
   runShairport: boolean;
   mqtt?: MqttTarget;

@@ -1,5 +1,5 @@
 import { BUILT_IN_INTENTS, PLAY_INTENT_SAMPLES } from "../constants.ts";
-import { validateInvocationName } from "./validation.ts";
+import { validateInvocationName } from "./invocation.ts";
 
 export function interactionModel(invocationName: string): string {
   const model = {

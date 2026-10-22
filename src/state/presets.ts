@@ -1,7 +1,6 @@
-import { PRESET_VALUES, PRESETS } from "./constants.ts";
+import { PRESET_VALUES } from "./constants.ts";
 import type { Preset, PresetValues } from "./types.ts";
-
-export const isPreset = (value: unknown): value is Preset => PRESETS.includes(value as Preset);
+import { isPreset } from "./validation.ts";
 
 export function presetValues(preset: Preset): PresetValues | null {
   return preset === "custom" ? null : PRESET_VALUES[preset];

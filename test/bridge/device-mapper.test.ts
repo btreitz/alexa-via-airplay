@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { LEARN_WINDOW_MS } from "../../src/bridge/constants.ts";
-import { isValidDeviceId } from "../../src/bridge/device-id.ts";
+import { isValidDeviceId } from "../../src/public/request/device-id.ts";
 import { DeviceMapper } from "../../src/bridge/device-mapper.ts";
 import { tempStore } from "../helpers.ts";
 

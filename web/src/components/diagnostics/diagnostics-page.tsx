@@ -1,15 +1,14 @@
 "use client";
 
-import { DefinitionList } from "@/components/common/definition-list";
+import { DefinitionList } from "@/components/common/layout/definition-list";
 import { ChecksList } from "@/components/diagnostics/checks-list";
 import { PublicRequestsTable } from "@/components/diagnostics/public-requests-table";
-import { Section } from "@/components/shell/section";
-import { ViewHeader } from "@/components/shell/view-header";
+import { Section } from "@/components/common/layout/section";
+import { ViewHeader } from "@/components/common/layout/view-header";
 import { useBridge } from "@/hooks/use-bridge";
 import { delayText, diagnosticChecks, publicAccessFacts } from "@/lib/diagnostics";
+import { FACT_COLUMNS } from "@/lib/constants";
 import { uptime } from "@/lib/format";
-
-const FACT_COLUMNS = "grid-cols-[14rem_1fr]";
 
 export function DiagnosticsPage() {
   const { status } = useBridge();

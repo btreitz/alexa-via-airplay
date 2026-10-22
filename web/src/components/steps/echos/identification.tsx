@@ -1,8 +1,8 @@
 "use client";
 
 import { RefreshCwIcon } from "lucide-react";
-import { ConfirmButton } from "@/components/bridge/confirm-button";
-import { StatusLine } from "@/components/shell/status-line";
+import { ConfirmButton } from "@/components/common/confirm-button";
+import { StatusLine } from "@/components/common/status/status-line";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useSpeakerAction } from "@/hooks/use-speaker-action";

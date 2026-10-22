@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { defaults } from "../../src/state/defaults.ts";
 import { SETTINGS_FORMAT } from "../../src/state/settings-file/constants.ts";
 import { exportSettings } from "../../src/state/settings-file/export.ts";
-import { parseSettingsFile } from "../../src/state/settings-file/parse.ts";
+import { parseSettingsFile } from "../../src/state/settings-file/parse/parse.ts";
 import type { State } from "../../src/state/types.ts";
 
 function sample(): State {

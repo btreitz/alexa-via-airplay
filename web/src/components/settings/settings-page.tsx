@@ -1,10 +1,10 @@
 "use client";
 
-import { AmazonAccountSettings } from "@/components/settings/amazon-account-settings";
-import { ExportSettings } from "@/components/settings/export-settings";
-import { PlaybackSettings } from "@/components/settings/playback-settings";
-import { SecuritySettings } from "@/components/settings/security-settings";
-import { ViewHeader } from "@/components/shell/view-header";
+import { AmazonAccountSettings } from "@/components/settings/groups/amazon-account";
+import { ExportSettings } from "@/components/settings/groups/export";
+import { PlaybackSettings } from "@/components/settings/groups/playback";
+import { SecuritySettings } from "@/components/settings/groups/security";
+import { ViewHeader } from "@/components/common/layout/view-header";
 import { useBridge } from "@/hooks/use-bridge";
 import { api, type SettingsUpdate } from "@/lib/api";
 

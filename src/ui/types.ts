@@ -1,9 +1,12 @@
 import type http from "node:http";
 import type { Bridge } from "../bridge/bridge.ts";
-import type { PublicServer } from "../public/public-server.ts";
+import type { PublicServer } from "../public/server/server.ts";
+import type { State } from "../state/types.ts";
 
 export type Params = Record<string, string>;
 export type Body = Record<string, unknown>;
+
+export type StateChange = (state: State) => void;
 
 export interface RouteContext {
   req: http.IncomingMessage;

@@ -1,9 +1,10 @@
-import { AirPlayNameInput } from "@/components/bridge/airplay-name-input";
-import { AirPlaySwitch } from "@/components/bridge/airplay-switch";
-import { TestSoundButton } from "@/components/bridge/test-sound-button";
-import { ECHO_COLUMNS } from "@/components/steps/echos/columns";
+import { AirPlayNameInput } from "@/components/speaker/airplay-name-input";
+import { AirPlaySwitch } from "@/components/speaker/airplay-switch";
+import { EchoLabel } from "@/components/speaker/echo-label";
+import { TestSoundButton } from "@/components/speaker/test-sound-button";
+import { ECHO_COLUMNS } from "@/lib/constants";
 import { Identification } from "@/components/steps/echos/identification";
-import { echoDetails, type EchoRow as Row } from "@/lib/echos";
+import type { EchoRow as Row } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function EchoRow({ row, skillReady }: { row: Row; skillReady: boolean }) {
@@ -11,10 +12,7 @@ export function EchoRow({ row, skillReady }: { row: Row; skillReady: boolean }) 
   return (
     <div className={cn("grid px-4 py-3", ECHO_COLUMNS)}>
       <AirPlaySwitch serial={row.serial} echoName={row.name} on={Boolean(receiver)} />
-      <div className="min-w-0">
-        <div className="truncate text-sm font-medium">{row.name}</div>
-        <div className="truncate text-xs text-muted-foreground">{echoDetails(row)}</div>
-      </div>
+      <EchoLabel row={row} strong />
       {receiver ? (
         <>
           <AirPlayNameInput

@@ -2,15 +2,16 @@
 
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { AppSidebar } from "@/components/shell/app-sidebar";
+import { AppSidebar } from "@/components/shell/sidebar/sidebar";
 import { ProblemsAlert } from "@/components/shell/problems-alert";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
 import { useBridge } from "@/hooks/use-bridge";
 import { useSetup } from "@/hooks/use-setup";
-import { blockingProblems, OFFLINE_MESSAGE } from "@/lib/problems";
-import { viewOf } from "@/lib/routes";
-import { isConnected } from "@/lib/speaker-state";
+import { OFFLINE_MESSAGE } from "@/lib/constants";
+import { blockingProblems } from "@/lib/setup/problems";
+import { viewOf } from "@/lib/setup/routes";
+import { connectedCount } from "@/lib/speakers/state";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { offline } = useBridge();
@@ -27,7 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const { status, steps } = setup;
   const problems = blockingProblems(status, offline);
-  const playing = status.receivers.filter(isConnected).length;
+  const playing = connectedCount(status.receivers);
 
   return (
     <SidebarProvider>

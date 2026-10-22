@@ -1,5 +1,7 @@
 export const TEST_SECONDS = 30;
 export const TEST_VOLUME = 40;
+export const TEST_BLOCKED_MESSAGE =
+  "AirPlay is playing on this speaker; the test would interrupt it.";
 
 export const TRIGGER_GRACE_MS = 20_000;
 export const OWN_STOP_MS = 10_000;
@@ -13,6 +15,4 @@ export const DROP_GRACE_MS = 3000;
 export const VOLUME_MIN_INTERVAL_MS = 1500;
 export const VOLUME_AFTER_CONNECT_MS = 1500;
 export const PLAY_REQUEST_MS = 10_000;
-
-export const MAX_RECEIVER_NAME_LENGTH = 50;
-export const DEVICE_ID_PATTERN = /^[A-Za-z0-9._-]{4,64}$/;
+export const MIN_AIRPLAY_VOLUME = -30;

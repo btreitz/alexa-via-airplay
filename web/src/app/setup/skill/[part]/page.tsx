@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SkillStep } from "@/components/steps/skill/skill-step";
-import { SKILL_PARTS, type SkillPart } from "@/lib/routes";
+import { SKILL_PARTS } from "@/lib/constants";
+import type { SkillPart } from "@/lib/types";
 
 export const dynamicParams = false;
 

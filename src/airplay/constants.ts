@@ -5,6 +5,8 @@ export const BYTES_PER_FRAME = 4;
 export const BYTES_PER_SECOND = SAMPLE_RATE * BYTES_PER_FRAME;
 export const FULL_SCALE = 32768;
 export const MIN_LEVEL_DB = -96;
+export const LEVEL_SAMPLE_STRIDE_BYTES = 8;
+export const LEVEL_WINDOW_SAMPLES = SAMPLE_RATE / 2;
 
 export const FILLER_TICK_MS = 20;
 export const SILENCE_AFTER_MS = 200;

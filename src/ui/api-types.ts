@@ -6,7 +6,7 @@ import type {
   SystemHealth,
 } from "../airplay/types.ts";
 import type { AlexaDevice, AlexaState } from "../alexa/types.ts";
-import type { SessionSnapshot } from "../bridge/types.ts";
+import type { ReceiverView, SessionSnapshot } from "../bridge/types.ts";
 import type { HomeIpStatus, PublicUrlResult, Rejection, RequestRecord } from "../public/types.ts";
 import type { Preset } from "../state/types.ts";
 
@@ -20,19 +20,11 @@ export type {
   Preset,
   PublicUrlResult,
   ReceiverStatus,
+  ReceiverView,
   RequestRecord,
   SessionSnapshot,
 };
 export type { ImportSummary, SettingsFile } from "../state/settings-file/types.ts";
-
-export interface ReceiverView extends ReceiverStatus {
-  mapped: boolean;
-  echoName?: string;
-  echoModel?: string | null;
-  echoOnline?: boolean;
-  session: SessionSnapshot | null;
-  test: { secondsLeft: number } | null;
-}
 
 export interface Settings {
   publicBaseUrl: string | null;

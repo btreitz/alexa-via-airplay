@@ -1,7 +1,7 @@
 import { URL_TTL_SECONDS } from "../../public/constants.ts";
 import { SKILL_REPORT_TIMEOUT_MS } from "../constants.ts";
 import type { SkillOptions } from "../types.ts";
-import { streamUrl } from "./validation.ts";
+import { streamUrl } from "../../public/url/base-url.ts";
 
 // The developer console rejects optional chaining and the runtime is Node 16: keep the generated code plain ES5-style.
 export function skillIndexJs({ publicBaseUrl, secret }: SkillOptions): string {

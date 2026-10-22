@@ -55,6 +55,11 @@ export interface QueuedCommand {
   reject: (reason?: unknown) => void;
 }
 
+export interface SerialQueue {
+  busy: boolean;
+  waiting: QueuedCommand[];
+}
+
 export type SendCommand = (serial: string, command: string, value: unknown) => Promise<void>;
 
 export interface SkillOptions {

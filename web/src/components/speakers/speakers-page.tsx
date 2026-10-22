@@ -1,24 +1,26 @@
 "use client";
 
-import { TextLink } from "@/components/common/text-link";
-import { NeedsStep } from "@/components/shell/needs-step";
-import { Section } from "@/components/shell/section";
-import { ViewHeader } from "@/components/shell/view-header";
+import { TextLink } from "@/components/common/links/text-link";
+import { NeedsStep } from "@/components/steps/shared/needs-step";
+import { Section } from "@/components/common/layout/section";
+import { ViewHeader } from "@/components/common/layout/view-header";
 import { OtherEcho } from "@/components/speakers/other-echo";
 import { SkillUpdateAlert } from "@/components/speakers/skill-update-alert";
-import { SpeakerCard } from "@/components/speakers/speaker-card";
+import { SpeakerCard } from "@/components/speakers/card/card";
 import { useSetup } from "@/hooks/use-setup";
-import { echoRows, type EchoRow } from "@/lib/echos";
+import { echoRows } from "@/lib/speakers/echo-rows";
+import type { EchoRow } from "@/lib/types";
 import { plural } from "@/lib/format";
-import { HREF } from "@/lib/routes";
-import { isConnected } from "@/lib/speaker-state";
+import { isSignedIn } from "@/lib/setup/steps";
+import { HREF } from "@/lib/constants";
+import { connectedCount } from "@/lib/speakers/state";
 
 const EYEBROW = "Bridge";
 const TITLE = "Speakers";
 
 function pageDescription(on: EchoRow[]): string {
   if (on.length === 0) return "Turn on an Echo below to make it an AirPlay speaker.";
-  const playing = on.filter((row) => isConnected(row.receiver!)).length;
+  const playing = connectedCount(on.map((row) => row.receiver!));
   return `${plural(on.length, "Echo")} on AirPlay${playing ? `, ${playing} playing` : ""}. Pick them on your iPhone or Mac like any AirPlay speaker; the Echo starts and stops with it.`;
 }
 
@@ -29,7 +31,7 @@ export function SpeakersPage() {
   const rows = echoRows(devices, status.receivers);
   const on = rows.filter((row) => row.receiver);
   const off = rows.filter((row) => !row.receiver);
-  const signedIn = status.alexa.status === "ready";
+  const signedIn = isSignedIn(status);
   const pending = steps.find((step) => !step.done);
 
   if (on.length === 0 && pending) {

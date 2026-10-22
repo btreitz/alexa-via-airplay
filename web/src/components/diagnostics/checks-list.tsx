@@ -1,4 +1,4 @@
-import { StatusLine } from "@/components/shell/status-line";
+import { StatusLine } from "@/components/common/status/status-line";
 import type { Tone } from "@/lib/types";
 
 export function ChecksList({ checks }: { checks: [Tone, string][] }) {

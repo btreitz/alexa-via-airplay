@@ -1,4 +1,5 @@
-import type { RemoteCommand } from "../airplay/types.ts";
+import type { Receiver } from "../airplay/receiver/receiver.ts";
+import type { CatchUp, ReceiverStatus, RemoteCommand } from "../airplay/types.ts";
 
 export type Resolution =
   { serial: string; learned: boolean } | { serial: null; reason: "unknown" | "ambiguous" };
@@ -59,4 +60,29 @@ export type SessionSnapshot = Omit<ReceiverSession, "volumeTimer" | "dropTimer">
 export interface SpeakerTest {
   endsAt: number;
   timer: NodeJS.Timeout;
+}
+
+export interface ReceiverView extends ReceiverStatus {
+  mapped: boolean;
+  echoName?: string;
+  echoModel?: string | null;
+  echoOnline?: boolean;
+  session: SessionSnapshot | null;
+  test: { secondsLeft: number } | null;
+}
+
+export interface ReceiverPoolOptions {
+  runDir: string;
+  runShairport: boolean;
+  mqtt: () => MqttSettings | undefined;
+  catchUp: () => CatchUp;
+  onAdded: (receiver: Receiver) => void;
+  onRemoved: (receiver: Receiver) => void;
+}
+
+export interface SpeakerTestDeps {
+  receiver(serial: string): Receiver | undefined;
+  setVolume(serial: string, volume: number): Promise<unknown>;
+  trigger(serial: string): Promise<unknown>;
+  stopEcho(serial: string): Promise<unknown>;
 }

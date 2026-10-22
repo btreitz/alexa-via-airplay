@@ -1,15 +1,16 @@
 "use client";
 
-import { Section } from "@/components/shell/section";
-import { StatusLine } from "@/components/shell/status-line";
-import { continueAction, StepFooter } from "@/components/shell/step-footer";
-import { ViewHeader } from "@/components/shell/view-header";
-import { PublicUrlForm } from "@/components/steps/public-url/public-url-form";
-import { PublicUrlHelp } from "@/components/steps/public-url/public-url-help";
+import { Section } from "@/components/common/layout/section";
+import { StatusLine } from "@/components/common/status/status-line";
+import { StepFooter } from "@/components/steps/shared/step-footer";
+import { continueAction } from "@/lib/setup/steps";
+import { ViewHeader } from "@/components/common/layout/view-header";
+import { PublicUrlForm } from "@/components/steps/public-url/form";
+import { PublicUrlHelp } from "@/components/steps/public-url/help";
 import { useSetup } from "@/hooks/use-setup";
 import type { PublicUrlResult } from "@/lib/api";
 import { ago } from "@/lib/format";
-import { HREF } from "@/lib/routes";
+import { HREF } from "@/lib/constants";
 import type { Tone } from "@/lib/types";
 
 function checkTone(check: PublicUrlResult): Tone {

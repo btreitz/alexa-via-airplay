@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { Disclosure } from "@/components/common/disclosure";
+import { Disclosure } from "@/components/common/layout/disclosure";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";

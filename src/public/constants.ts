@@ -1,4 +1,5 @@
 export const STREAM_PATH = "/play.mp3";
+export const DEVICE_ID_PATTERN = /^[A-Za-z0-9._-]{4,64}$/;
 export const URL_TTL_SECONDS = 60;
 export const CLOCK_SKEW_SECONDS = 30;
 export const MAX_TTL_SECONDS = 300;
@@ -9,6 +10,7 @@ export const MAX_LOGGED_QUERY_VALUE = 64;
 
 export const SKILL_EVENTS = ["started", "stopped", "failed", "paused", "resumed"] as const;
 export const SKILL_REPORT_EXPECTED_MS = 20_000;
+export const REPORT_KEYS = ["d", "e", "exp", "sig"] as const;
 
 export const NOT_FOUND_BODY = "Not found\n";
 export const RECENT_REQUESTS_LIMIT = 50;

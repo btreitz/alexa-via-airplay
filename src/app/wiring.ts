@@ -1,16 +1,20 @@
-import type { EventBus } from "../airplay/event-bus.ts";
+import type { EventBus } from "../airplay/events/event-bus.ts";
 import type { Bridge } from "../bridge/bridge.ts";
-import { SessionManager } from "../bridge/session/session-manager.ts";
-import type { PublicServer } from "../public/public-server.ts";
+import { SessionManager } from "../bridge/session/manager.ts";
+import type { PublicServer } from "../public/server/server.ts";
 import type { SkillReport, StreamEvent } from "../public/types.ts";
 import { SESSION_TICK_MS, WARM_UP_EVENTS } from "./constants.ts";
 
-export function createSessions(bridge: Bridge, events: EventBus): SessionManager {
-  return new SessionManager({
+export function wireSessions(
+  bridge: Bridge,
+  publicServer: PublicServer,
+  events: EventBus,
+): SessionManager {
+  const sessions = new SessionManager({
     receiver: (id) => bridge.receiverById(id),
     trigger: (serial) => bridge.triggerEcho(serial),
     stop: (serial) => bridge.stopEcho(serial),
-    setVolume: (serial, percent) => bridge.alexa.setVolume(serial, percent),
+    setVolume: (serial, percent) => bridge.setVolume(serial, percent),
     remote: (id, command) => events.remote(id, command),
     settings: () => bridge.store.get(),
     canControl: () => bridge.alexa.ready,
@@ -18,15 +22,7 @@ export function createSessions(bridge: Bridge, events: EventBus): SessionManager
     endStream: (id) => bridge.receiverById(id)?.stream.dropAll(),
     allowStream: (serial) => bridge.allowStream(serial),
   });
-}
-
-export function wireSessions(
-  bridge: Bridge,
-  publicServer: PublicServer,
-  events: EventBus,
-  sessions: SessionManager,
-): void {
-  bridge.sessions = sessions;
+  bridge.useSessions(sessions);
   bridge.on("receiver-added", (receiver) => {
     sessions.track(receiver.id);
     receiver.input.on("active", () => sessions.onAudio(receiver.id));
@@ -42,4 +38,5 @@ export function wireSessions(
     sessions.onEvent(receiver, event, payload);
   });
   setInterval(() => sessions.tick(), SESSION_TICK_MS).unref();
+  return sessions;
 }

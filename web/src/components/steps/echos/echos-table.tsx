@@ -1,8 +1,8 @@
-import { StatusLine } from "@/components/shell/status-line";
-import { ECHO_COLUMNS } from "@/components/steps/echos/columns";
+import { StatusLine } from "@/components/common/status/status-line";
+import { ECHO_COLUMNS } from "@/lib/constants";
 import { EchoRow } from "@/components/steps/echos/echo-row";
 import { TEST_EXPLANATION } from "@/lib/constants";
-import type { EchoRow as Row } from "@/lib/echos";
+import type { EchoRow as Row } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const HEADINGS = ["AirPlay", "Echo", "Name on your iPhone", "Identified", "Test"];

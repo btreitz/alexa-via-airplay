@@ -1,12 +1,13 @@
 "use client";
 
-import { NeedsStep } from "@/components/shell/needs-step";
-import { continueAction, StepFooter } from "@/components/shell/step-footer";
-import { ViewHeader } from "@/components/shell/view-header";
+import { NeedsStep } from "@/components/steps/shared/needs-step";
+import { StepFooter } from "@/components/steps/shared/step-footer";
+import { continueAction } from "@/lib/setup/steps";
+import { ViewHeader } from "@/components/common/layout/view-header";
 import { EchosTable } from "@/components/steps/echos/echos-table";
 import { useSetup } from "@/hooks/use-setup";
-import { echoRows } from "@/lib/echos";
-import { HREF } from "@/lib/routes";
+import { echoRows } from "@/lib/speakers/echo-rows";
+import { HREF } from "@/lib/constants";
 
 export function EchosStep() {
   const setup = useSetup();

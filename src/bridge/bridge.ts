@@ -1,30 +1,33 @@
 import { EventEmitter } from "node:events";
-import { runHostChecks } from "../airplay/host-checks.ts";
-import type { Receiver } from "../airplay/receiver.ts";
-import { airplayDeviceIdFor } from "../airplay/receiver-ids.ts";
-import { SystemServices } from "../airplay/system-services.ts";
+import { runHostChecks } from "../airplay/system/host-checks.ts";
+import type { Receiver } from "../airplay/receiver/receiver.ts";
+import { airplayDeviceIdFor } from "../airplay/receiver/ids.ts";
+import { SystemServices } from "../airplay/system/services.ts";
 import type { Check } from "../airplay/types.ts";
-import { AlexaController } from "../alexa/alexa-controller.ts";
-import { launchPhrase } from "../alexa/skill/validation.ts";
+import { AlexaController } from "../alexa/controller/controller.ts";
+import { launchPhrase } from "../alexa/skill/invocation.ts";
 import { dataPath } from "../config/config.ts";
 import { ALEXA_SESSION_FILE, STATE_FILE } from "../config/constants.ts";
 import type { Config } from "../config/types.ts";
+import { errorMessage } from "../lib/errors.ts";
 import { logger } from "../lib/log.ts";
 import { waitFor } from "../lib/time.ts";
-import { ClientIpResolver } from "../public/client-ip-resolver.ts";
-import { HomeIpMonitor } from "../public/home-ip-monitor.ts";
+import { ClientIpResolver } from "../public/ip/client-resolver.ts";
+import { HomeIpMonitor } from "../public/ip/home-monitor.ts";
+import type { PublicServer } from "../public/server/server.ts";
 import type { PublicUrlResult, SkillEvent } from "../public/types.ts";
-import { StateStore } from "../state/state-store.ts";
+import { checkPublicUrl } from "../public/url/check.ts";
+import { StateStore } from "../state/store.ts";
 import type { ReceiverEntry } from "../state/types.ts";
-import type { ReceiverView } from "../ui/api-types.ts";
+import { validateReceiverName } from "../state/validation.ts";
 import { LEARN_WINDOW_MS, MAPPING_POLL_MS, OWN_STOP_MS, TRIGGER_GRACE_MS } from "./constants.ts";
 import { DeviceMapper } from "./device-mapper.ts";
-import { ReceiverPool } from "./receiver-pool.ts";
-import { defaultReceiverName, nextFreePort, validateReceiverName } from "./receiver-names.ts";
-import { receiverViews } from "./receiver-views.ts";
-import type { SessionManager } from "./session/session-manager.ts";
+import { ReceiverPool } from "./receivers/pool.ts";
+import { defaultReceiverName, nextFreePort } from "./receivers/names.ts";
+import { idleReceiverStatus } from "./receivers/idle-status.ts";
+import type { SessionManager } from "./session/manager.ts";
 import { SpeakerTests } from "./speaker-tests.ts";
-import type { MqttSettings } from "./types.ts";
+import type { MqttSettings, ReceiverView } from "./types.ts";
 
 export class Bridge extends EventEmitter {
   readonly config: Config;
@@ -34,15 +37,15 @@ export class Bridge extends EventEmitter {
   readonly system?: SystemServices;
   readonly homeIp: HomeIpMonitor;
   readonly clientIp: ClientIpResolver;
-  mqtt?: MqttSettings;
-  sessions?: SessionManager;
   checks: Check[] = [];
-  publicUrlCheck: PublicUrlResult | null = null;
   private readonly log = logger("bridge");
   private readonly receivers: ReceiverPool;
   private readonly tests: SpeakerTests;
   private readonly lastTriggerAt = new Map<string, number>();
   private readonly lastStopAt = new Map<string, number>();
+  private mqtt?: MqttSettings;
+  private sessions?: SessionManager;
+  private urlCheck: PublicUrlResult | null = null;
 
   constructor(config: Config) {
     super();
@@ -82,6 +85,18 @@ export class Bridge extends EventEmitter {
     return this.config.publicBaseUrl || this.store.get().publicBaseUrl;
   }
 
+  get publicUrlCheck(): PublicUrlResult | null {
+    return this.urlCheck;
+  }
+
+  useSessions(sessions: SessionManager): void {
+    this.sessions = sessions;
+  }
+
+  useEventBus(mqtt: MqttSettings): void {
+    this.mqtt = mqtt;
+  }
+
   async start(): Promise<void> {
     void this.homeIp.start();
     if (this.config.manageReceivers) await this.checkHost();
@@ -109,6 +124,10 @@ export class Bridge extends EventEmitter {
     return this.receivers.all();
   }
 
+  hasReceiver(serial: string): boolean {
+    return this.store.get().receivers.some((r) => r.serial === serial);
+  }
+
   reconcile(): Promise<void> {
     return this.receivers.reconcile(this.store.get().receivers);
   }
@@ -125,6 +144,21 @@ export class Bridge extends EventEmitter {
 
   allowStream(serial: string): void {
     this.lastTriggerAt.set(serial, Date.now());
+  }
+
+  login(amazonPage: string, proxyHost: string): void {
+    this.store.update((s) => {
+      s.amazonPage = amazonPage;
+    });
+    this.alexa.startLogin(amazonPage, proxyHost, this.config.alexaProxyPort);
+  }
+
+  setVolume(serial: string, volume: number): Promise<void> {
+    return this.alexa.setVolume(serial, volume);
+  }
+
+  forgetMapping(serial: string): void {
+    this.mapper.forget(serial);
   }
 
   async addReceiver(serial: string, name?: string): Promise<ReceiverEntry> {
@@ -193,13 +227,47 @@ export class Bridge extends EventEmitter {
     this.sessions?.onSkillEvent(receiver.id, event);
   }
 
+  resetPublicUrlCheck(): void {
+    this.urlCheck = null;
+  }
+
+  async checkPublicUrl(publicServer: PublicServer): Promise<PublicUrlResult> {
+    const base = this.publicBaseUrl;
+    if (!base) throw new Error("Set the public base URL first");
+    const result = await checkPublicUrl(base, publicServer, this.homeIp);
+    this.urlCheck = result;
+    if (result.ok) {
+      this.store.update((s) => {
+        s.publicUrlVerifiedAt = result.checkedAt;
+      });
+    }
+    return result;
+  }
+
+  async recheckVerifiedPublicUrl(publicServer: PublicServer): Promise<void> {
+    if (!this.publicBaseUrl || !this.store.get().publicUrlVerifiedAt) return;
+    try {
+      await this.checkPublicUrl(publicServer);
+    } catch (err) {
+      this.log.warn("public URL check failed", { error: errorMessage(err) });
+    }
+  }
+
   receiverStatuses(): ReceiverView[] {
-    return receiverViews(this.store.get().receivers, {
-      receiver: (serial) => this.receiverBySerial(serial),
-      devices: this.alexa.devices(),
-      isMapped: (serial) => this.mapper.isMapped(serial),
-      session: (id) => this.sessions?.snapshot(id) ?? null,
-      testSecondsLeft: (serial) => this.tests.secondsLeft(serial),
+    const devices = new Map(this.alexa.devices().map((device) => [device.serial, device]));
+    return this.store.get().receivers.map((entry) => {
+      const status = this.receiverBySerial(entry.serial)?.status() ?? idleReceiverStatus(entry);
+      const device = devices.get(entry.serial);
+      const secondsLeft = this.tests.secondsLeft(entry.serial);
+      return {
+        ...status,
+        mapped: this.mapper.isMapped(entry.serial),
+        echoName: device?.name,
+        echoModel: device?.model,
+        echoOnline: device?.online,
+        session: this.sessions?.snapshot(status.id) ?? null,
+        test: secondsLeft === null ? null : { secondsLeft },
+      };
     });
   }
 
@@ -220,7 +288,7 @@ export class Bridge extends EventEmitter {
   }
 
   private onEchoStarted(receiver: Receiver): void {
-    const start = receiver.stream.echoStarted();
+    const start = receiver.stream.echo.started();
     this.log.info("Echo started playing", {
       receiver: receiver.id,
       afterMs: start.waitedMs,

@@ -13,6 +13,7 @@ import {
   DEFAULT_RUN_DIR,
   DEFAULT_TRUSTED_PROXIES,
   DEFAULT_UI_PORT,
+  DEFAULT_WEB_DIR,
 } from "./constants.ts";
 import { envInteger, envList, envPort, envString } from "./env.ts";
 import type { Config } from "./types.ts";
@@ -46,6 +47,8 @@ export function loadConfig(): Config {
     ipv6PrefixLength: envInteger("PUBLIC_IP_V6_PREFIX", DEFAULT_IPV6_PREFIX_LENGTH, 32, 128),
     clientIpHeader: clientIpHeader(),
     trustedProxies: envList("TRUSTED_PROXIES", DEFAULT_TRUSTED_PROXIES),
+    webDir: envString("WEB_DIR") ?? DEFAULT_WEB_DIR,
+    uiDevOrigin: envString("UI_DEV_ORIGIN") ?? null,
   };
 }
 

@@ -1,12 +1,12 @@
 "use client";
 
-import { HowItWorks } from "@/components/bridge/how-it-works/how-it-works";
-import { SettingsImport } from "@/components/bridge/settings-import/settings-import";
-import { Section } from "@/components/shell/section";
-import { StepFooter } from "@/components/shell/step-footer";
-import { ViewHeader } from "@/components/shell/view-header";
+import { HowItWorks } from "@/components/steps/introduction/how-it-works/how-it-works";
+import { SettingsImport } from "@/components/steps/introduction/settings-import/settings-import";
+import { Section } from "@/components/common/layout/section";
+import { StepFooter } from "@/components/steps/shared/step-footer";
+import { ViewHeader } from "@/components/common/layout/view-header";
 import { SetupNeeds } from "@/components/steps/introduction/setup-needs";
-import { HREF } from "@/lib/routes";
+import { HREF } from "@/lib/constants";
 
 export function Introduction() {
   return (

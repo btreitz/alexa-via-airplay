@@ -1,6 +1,6 @@
-import { Disclosure } from "@/components/common/disclosure";
-import { TextLink } from "@/components/common/text-link";
-import { HREF } from "@/lib/routes";
+import { Disclosure } from "@/components/common/layout/disclosure";
+import { TextLink } from "@/components/common/links/text-link";
+import { HREF } from "@/lib/constants";
 
 export function SecretNote() {
   return (

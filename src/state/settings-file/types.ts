@@ -17,3 +17,8 @@ export interface ImportSummary {
 }
 
 export type RawState = Record<string, unknown>;
+
+export interface SeenReceivers {
+  serials: Set<string>;
+  ports: Set<number>;
+}

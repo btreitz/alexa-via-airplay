@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { useSetup } from "@/hooks/use-setup";
-import { HREF } from "@/lib/routes";
-import { defaultView } from "@/lib/setup";
+import { HREF } from "@/lib/constants";
+import { defaultView } from "@/lib/setup/steps";
 
 export default function Home() {
   const router = useRouter();

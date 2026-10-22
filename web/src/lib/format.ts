@@ -1,3 +1,5 @@
+import { secondsSince } from "@bridge/lib/time.ts";
+
 export function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
@@ -10,7 +12,7 @@ export function secondsAgo(seconds: number): string {
 
 export function ago(time: string | number | null | undefined): string {
   if (!time) return "never";
-  return secondsAgo(Math.round((Date.now() - new Date(time).getTime()) / 1000));
+  return secondsAgo(secondsSince(new Date(time).getTime()));
 }
 
 export function uptime(seconds: number): string {

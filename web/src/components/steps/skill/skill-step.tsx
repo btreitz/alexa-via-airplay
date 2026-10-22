@@ -1,16 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { FooterAction } from "@/components/shell/footer-button";
-import { NeedsStep } from "@/components/shell/needs-step";
-import { StepFooter } from "@/components/shell/step-footer";
-import { ViewHeader } from "@/components/shell/view-header";
+import { NeedsStep } from "@/components/steps/shared/needs-step";
+import { StepFooter } from "@/components/steps/shared/step-footer";
+import { ViewHeader } from "@/components/common/layout/view-header";
 import { PartTabs } from "@/components/steps/skill/part-tabs";
-import { PARTS_WITH_FILES, SkillPartContent } from "@/components/steps/skill/skill-part-content";
+import { SkillPartContent } from "@/components/steps/skill/parts/part-content";
 import { useSetup } from "@/hooks/use-setup";
 import { setSkillConfirmed } from "@/hooks/use-skill-confirmed";
 import { useSkillFiles } from "@/hooks/use-skill-files";
-import { HREF, SKILL_PARTS, skillPartHref, type SkillPart } from "@/lib/routes";
+import { HREF, SKILL_PARTS, SKILL_PARTS_WITH_FILES } from "@/lib/constants";
+import { skillPartHref } from "@/lib/setup/routes";
+import type { FooterAction, SkillPart } from "@/lib/types";
 
 const AMAZON_STEP: FooterAction = { label: "Amazon account", href: HREF.amazon };
 
@@ -30,7 +31,7 @@ export function SkillStep({ part }: { part: SkillPart }) {
   const index = SKILL_PARTS.findIndex((p) => p.slug === part);
   const settings = setup?.status.settings;
   const skill = useSkillFiles(
-    PARTS_WITH_FILES.includes(part),
+    SKILL_PARTS_WITH_FILES.includes(part),
     settings?.publicBaseUrl,
     settings?.invocationName,
   );

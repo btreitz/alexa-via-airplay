@@ -2,14 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import crypto from "node:crypto";
 import vm from "node:vm";
-import { verifyEventSignature, verifySignature } from "../../src/public/signing.ts";
+import { verifyEventSignature, verifySignature } from "../../src/public/request/signing.ts";
 import { skillIndexJs } from "../../src/alexa/skill/index-js.ts";
 import { interactionModel } from "../../src/alexa/skill/interaction-model.ts";
-import {
-  launchPhrase,
-  normalizeBaseUrl,
-  validateInvocationName,
-} from "../../src/alexa/skill/validation.ts";
+import { launchPhrase, validateInvocationName } from "../../src/alexa/skill/invocation.ts";
+import { normalizeBaseUrl } from "../../src/public/url/base-url.ts";
 
 const options = {
   publicBaseUrl: "https://bridge.example.com/",

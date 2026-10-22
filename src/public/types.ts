@@ -1,8 +1,8 @@
 import type http from "node:http";
 import type { Writable } from "node:stream";
 import type { DeviceMapper } from "../bridge/device-mapper.ts";
-import type { StateStore } from "../state/state-store.ts";
-import type { ClientIpResolver } from "./client-ip-resolver.ts";
+import type { StateStore } from "../state/store.ts";
+import type { ClientIpResolver } from "./ip/client-resolver.ts";
 import type { SKILL_EVENTS } from "./constants.ts";
 
 export type SkillEvent = (typeof SKILL_EVENTS)[number];
@@ -119,3 +119,13 @@ export interface PublicUrlResult {
 }
 
 export type Headers = Record<string, string | string[] | undefined>;
+
+export interface StreamListeners {
+  open(event: StreamEvent): void;
+  close(event: StreamEvent, seconds: number): void;
+}
+
+export interface SelectedReceiver {
+  serial: string;
+  receiver: StreamTarget;
+}

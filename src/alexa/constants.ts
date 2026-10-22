@@ -2,6 +2,8 @@ export const COMMAND_TIMEOUT_MS = 15_000;
 export const AUTH_REFRESH_MS = 25 * 60_000;
 export const WARM_MIN_INTERVAL_MS = 30_000;
 export const VOLUME_GAP_MS = 1000;
+export const MIN_VOLUME = 0;
+export const MAX_VOLUME = 100;
 export const HTTPS_KEEP_ALIVE_MS = 60_000;
 export const SESSION_FILE_MODE = 0o600;
 

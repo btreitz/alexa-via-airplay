@@ -1,4 +1,4 @@
-import type { StateStore } from "../state/state-store.ts";
+import type { StateStore } from "../state/store.ts";
 import { LEARN_WINDOW_MS } from "./constants.ts";
 import type { Resolution } from "./types.ts";
 

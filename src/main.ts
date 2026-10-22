@@ -1,18 +1,17 @@
-import { EventBus } from "./airplay/event-bus.ts";
-import { topicFor } from "./airplay/event-topics.ts";
+import { EventBus } from "./airplay/events/event-bus.ts";
+import { topicFor } from "./airplay/events/topics.ts";
 import {
   FIRST_URL_RECHECK_MS,
   FORCED_EXIT_AFTER_MS,
   URL_RECHECK_INTERVAL_MS,
 } from "./app/constants.ts";
-import { createSessions, wireSessions } from "./app/wiring.ts";
+import { wireSessions } from "./app/wiring.ts";
 import { Bridge } from "./bridge/bridge.ts";
 import { loadConfig } from "./config/config.ts";
 import { errorMessage } from "./lib/errors.ts";
 import { logger } from "./lib/log.ts";
-import { PublicServer } from "./public/public-server.ts";
-import { recheckVerifiedPublicUrl } from "./public/url-recheck.ts";
-import { UiServer } from "./ui/ui-server.ts";
+import { PublicServer } from "./public/server/server.ts";
+import { UiServer } from "./ui/server.ts";
 
 const log = logger("main");
 
@@ -31,7 +30,7 @@ function handleShutdown(stop: () => Promise<void>): void {
 }
 
 function scheduleUrlRechecks(bridge: Bridge, publicServer: PublicServer): void {
-  const recheck = () => void recheckVerifiedPublicUrl(bridge, publicServer);
+  const recheck = () => void bridge.recheckVerifiedPublicUrl(publicServer);
   setTimeout(recheck, FIRST_URL_RECHECK_MS).unref();
   setInterval(recheck, URL_RECHECK_INTERVAL_MS).unref();
 }
@@ -48,7 +47,7 @@ async function main(): Promise<void> {
     recentlyTriggered: (serial) => bridge.recentlyTriggered(serial),
   });
   const events = new EventBus();
-  wireSessions(bridge, publicServer, events, createSessions(bridge, events));
+  wireSessions(bridge, publicServer, events);
   const ui = new UiServer(bridge, publicServer);
 
   handleShutdown(async () => {
@@ -59,7 +58,7 @@ async function main(): Promise<void> {
 
   if (config.manageReceivers) {
     await events.start(config.eventBusPort);
-    bridge.mqtt = { port: events.port, topicFor };
+    bridge.useEventBus({ port: events.port, topicFor });
   }
   await bridge.start();
   await publicServer.listen(config.publicPort, config.publicBind);

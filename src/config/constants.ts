@@ -1,4 +1,11 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 export const DEFAULT_DATA_DIR = "/data";
+export const DEFAULT_WEB_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../web/out",
+);
 export const DEFAULT_RUN_DIR = "/run/alexa-via-airplay";
 export const DEFAULT_BIND = "0.0.0.0";
 export const DEFAULT_PUBLIC_PORT = 8099;

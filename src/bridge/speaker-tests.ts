@@ -1,15 +1,7 @@
-import type { Receiver } from "../airplay/receiver.ts";
 import { errorMessage } from "../lib/errors.ts";
 import { logger } from "../lib/log.ts";
-import { TEST_SECONDS, TEST_VOLUME } from "./constants.ts";
-import type { SpeakerTest } from "./types.ts";
-
-interface SpeakerTestDeps {
-  receiver(serial: string): Receiver | undefined;
-  setVolume(serial: string, volume: number): Promise<unknown>;
-  trigger(serial: string): Promise<unknown>;
-  stopEcho(serial: string): Promise<unknown>;
-}
+import { TEST_BLOCKED_MESSAGE, TEST_SECONDS, TEST_VOLUME } from "./constants.ts";
+import type { SpeakerTest, SpeakerTestDeps } from "./types.ts";
 
 export class SpeakerTests {
   private readonly log = logger("bridge");
@@ -33,7 +25,7 @@ export class SpeakerTests {
     const receiver = this.deps.receiver(serial);
     if (!receiver) throw new Error("Not a receiver");
     if (receiver.input.active) {
-      throw new Error("AirPlay is playing on this speaker; the test would interrupt it");
+      throw new Error(TEST_BLOCKED_MESSAGE);
     }
     this.end(serial);
     receiver.stream.startTone();

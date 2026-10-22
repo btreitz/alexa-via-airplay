@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { AppShell } from "@/components/shell/app-shell";
-import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeProvider } from "@/components/shell/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BridgeProvider } from "@/hooks/use-bridge";

@@ -16,4 +16,6 @@ export interface Config {
   ipv6PrefixLength: number;
   clientIpHeader: string | null;
   trustedProxies: string[];
+  webDir: string;
+  uiDevOrigin: string | null;
 }

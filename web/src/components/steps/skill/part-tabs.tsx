@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { SKILL_PARTS, skillPartHref } from "@/lib/routes";
+import { SKILL_PARTS } from "@/lib/constants";
+import { skillPartHref } from "@/lib/setup/routes";
 import { cn } from "@/lib/utils";
 
 export function PartTabs({ part }: { part: number }) {

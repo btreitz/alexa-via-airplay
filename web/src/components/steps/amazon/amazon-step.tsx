@@ -1,14 +1,15 @@
 "use client";
 
-import { continueAction, StepFooter } from "@/components/shell/step-footer";
-import { ViewHeader } from "@/components/shell/view-header";
-import { AmazonLoginPending } from "@/components/steps/amazon/amazon-login-pending";
-import { AmazonSignedIn } from "@/components/steps/amazon/amazon-signed-in";
-import { AmazonSignInForm } from "@/components/steps/amazon/amazon-sign-in-form";
+import { StepFooter } from "@/components/steps/shared/step-footer";
+import { continueAction } from "@/lib/setup/steps";
+import { ViewHeader } from "@/components/common/layout/view-header";
+import { AmazonLoginPending } from "@/components/steps/amazon/login-pending";
+import { AmazonSignedIn } from "@/components/steps/amazon/signed-in";
+import { AmazonSignInForm } from "@/components/steps/amazon/sign-in-form";
 import { Spinner } from "@/components/ui/spinner";
 import { useSetup } from "@/hooks/use-setup";
 import type { DeviceView, StatusResponse } from "@/lib/api";
-import { HREF } from "@/lib/routes";
+import { HREF } from "@/lib/constants";
 
 function AmazonBody({ status, devices }: { status: StatusResponse; devices: DeviceView[] }) {
   const { alexa } = status;

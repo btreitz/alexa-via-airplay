@@ -3,7 +3,8 @@
 import { useBridge } from "@/hooks/use-bridge";
 import { useSkillConfirmed } from "@/hooks/use-skill-confirmed";
 import type { DeviceView, StatusResponse } from "@/lib/api";
-import { setupSteps, type Step } from "@/lib/setup";
+import { setupSteps } from "@/lib/setup/steps";
+import type { Step } from "@/lib/types";
 
 export interface Setup {
   status: StatusResponse;

@@ -1,7 +1,7 @@
 import { InfoIcon } from "lucide-react";
-import { TextLink } from "@/components/common/text-link";
+import { TextLink } from "@/components/common/links/text-link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { skillPartHref } from "@/lib/routes";
+import { skillPartHref } from "@/lib/setup/routes";
 
 export function SkillUpdateAlert() {
   return (
