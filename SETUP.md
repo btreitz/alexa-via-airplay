@@ -15,7 +15,8 @@ You need:
 
 - [ ] **A machine with Docker** that's always on and on the same network as your iPhone or
       Mac: a Raspberry Pi 4/5, a small VM or anything else. The bridge uses a few percent
-      of CPU and well under 100 MB of RAM.
+      of CPU and well under 100 MB of RAM. Linux is needed for host networking. On a Mac
+      or Windows PC, use a Linux VM with bridged networking; Docker Desktop doesn't work.
 - [ ] **A public HTTPS address**, for example through a Cloudflare Tunnel. (Any other
       HTTPS reverse proxy works too; see
       [Other ways to publish the port](#other-ways-to-publish-the-port).) This is where
