@@ -1,111 +1,109 @@
-# alexa-via-airplay
+# Alexa via AirPlay
 
-A small self-hosted service that makes Amazon Echo speakers available as
-AirPlay 2 receivers. You pick which Echos to expose, and each one shows up on
-your iPhone or Mac like any other AirPlay speaker.
+**Turn your Amazon Echos into AirPlay 2 speakers.**
 
-## How it works
+Your Echos show up in the AirPlay menu of your iPhone, iPad and Mac, right next to
+your other speakers. Pick one, press play, and the music comes out of the Echo. No
+Bluetooth pairing, no Alexa app, no "Alexa, connect my phone".
 
-```
-iPhone/Mac ──AirPlay 2──▶ bridge (Shairport Sync per Echo) ──MP3──▶ public HTTPS URL ──▶ Echo
-                              │                                                          ▲
-                              └── Alexa web API: "open <your skill>", volume, stop ──────┘
-```
+<p align="center">
+  <em>iPhone or Mac &nbsp;→&nbsp; AirPlay &nbsp;→&nbsp; this bridge &nbsp;→&nbsp; your Echo</em>
+</p>
 
-- One container on your LAN runs one AirPlay 2 receiver (Shairport Sync 5.6)
-  per selected Echo, sharing one NQPTP clock and one Avahi.
-- When you play to such a receiver, the bridge tells that Echo to open your
-  own private Alexa skill. The skill answers with a short-lived signed URL of
-  the bridge's stream, which the Echo then plays.
-- The stream must be reachable over public HTTPS (Amazon rejects LAN URLs);
-  a Cloudflare Tunnel that you run next to the bridge is the easiest way.
-  Only your own Echos can play it: signed URLs, your home's public IP, and
-  active sessions only.
-- Volume follows the sender; the Echo stops when you stop AirPlay.
+## Why it's nice
 
-Latency is 2–4 seconds: good for music, not for video.
+- **Real AirPlay 2 speakers.** Every Echo you choose becomes its own AirPlay 2 receiver.
+  It works from Control Center, from the lock screen, and from every app that can play to
+  AirPlay: Apple Music, Spotify, Podcasts, Audible, YouTube, Safari.
+- **Group them.** AirPlay 2 lets you pick several speakers at once: play to the kitchen
+  and the bathroom Echo together, or add them to a group with your other AirPlay
+  speakers.
+- **It just follows along.** Start AirPlay and the Echo starts by itself. Change the
+  volume on your phone and the Echo follows. Stop or switch speakers and the Echo stops.
+- **Alexa still works.** Say "Alexa, stop" and your phone pauses. "Alexa, resume" plays
+  again.
+- **Close behind your phone.** The bridge measures each Echo's buffer and trims it, so
+  the Echo plays about 1.5–2 seconds behind your phone. Great for music, podcasts and
+  audiobooks.
+- **Yours alone.** It runs on your own hardware. The stream is only served to your own
+  Echos: short-lived signed links, only from your home's internet address, only while you
+  play.
+- **Guided setup.** A web UI walks you through every step and tests each one, down to a
+  test chime on each Echo.
 
-## Quick start
+## How it works, in one paragraph
 
-You need a Linux host with Docker on the same network as your Apple
-devices, a domain on Cloudflare (or another way to publish one port over
-HTTPS), and the Amazon account that owns the Echos.
+A small Docker container on your home network runs one AirPlay 2 receiver per Echo. When
+you play to one, the bridge asks Amazon to open your own private Alexa skill on that Echo.
+The skill hands the Echo a short-lived link to the bridge's audio stream, and the Echo
+plays it. Echos only play audio from public HTTPS addresses, so the stream is reachable
+through a public URL of yours, typically a free Cloudflare Tunnel. [SETUP.md](SETUP.md)
+has a diagram.
 
-1. Create a Cloudflare Tunnel with a public hostname pointing to
-   `http://localhost:8099`, and run cloudflared with its token on the same
-   host with host networking (SETUP.md has a compose file for it).
-2. `cp .env.example .env`, set `PUBLIC_BIND=127.0.0.1`, then
-   `docker compose up -d --build` (or deploy this repository as a Portainer
-   stack).
-3. Open `http://<host>:8098/` and follow the steps there: check the public
-   URL, sign in to Amazon, create your Alexa skill by pasting the two
-   generated files, select your Echos.
+## What you need
 
-The full walkthrough, including the security model, troubleshooting and
-limits, is in **[SETUP.md](SETUP.md)**. All options are listed in
-[`.env.example`](.env.example).
+- A Linux machine that's always on, with Docker, on the same network as your iPhone or
+  Mac: a Raspberry Pi, a small VM or an LXC container is plenty.
+- A domain on Cloudflare (the free plan is fine), or another way to publish one port over
+  HTTPS.
+- The Amazon account your Echos belong to, and a free Amazon developer account with the
+  same login.
 
-## Ports
+## Get started
 
-| Port         | Purpose                                   | Exposure                               |
-| ------------ | ----------------------------------------- | -------------------------------------- |
-| 8098/tcp     | Web UI and API                            | LAN only, never publish                |
-| 8099/tcp     | Public stream (`/play.mp3` only)          | Through the tunnel or your HTTPS proxy |
-| 3456/tcp     | Amazon login proxy, only while signing in | LAN                                    |
-| 7000+/tcp    | AirPlay, one per receiver                 | LAN                                    |
-| 319, 320/udp | NQPTP (AirPlay 2 timing)                  | LAN                                    |
-| 5353/udp     | mDNS                                      | LAN                                    |
+1. **Make one port reachable over HTTPS**: a Cloudflare Tunnel takes about five minutes.
+2. **Start the container** with `docker compose up -d --build`, or as a Portainer stack.
+3. **Open the web UI** at `http://<your server>:8098` and follow the four steps: public
+   URL, Amazon sign-in, your Alexa skill, your Echos.
 
-The container needs `network_mode: host`.
+About 30 minutes in total, most of it clicking through Amazon's developer console. The
+**[setup guide](SETUP.md)** takes you through it.
 
-## Development
+## Good to know
 
-A pnpm workspace: the bridge (TypeScript on Node ≥ 22.18, run directly
-without a build step; `tsc` only type-checks) at the root, and the web UI
-(Next.js with shadcn/ui) in `web/`.
+- The delay of about 1.5–2 seconds suits music and spoken word, but not video.
+- An Echo in an AirPlay group plays slightly behind HomePods and other AirPlay speakers:
+  fine in different rooms, noticeable in the same one.
+- The bridge controls Echos through Amazon's unofficial web API, which can change without
+  notice.
+- This is a personal project, not affiliated with Amazon or Apple.
+
+---
+
+## For developers
+
+The bridge is TypeScript on Node ≥ 22.18, run directly without a build step. The web UI
+is Next.js with shadcn/ui, exported as static files that the bridge serves itself. It's a
+pnpm workspace: the bridge at the root, the UI in `web/`.
 
 ```bash
 pnpm install
-pnpm check           # type-check bridge and UI, run the tests
-pnpm build           # build the UI (static export to web/out)
+pnpm check        # format check, type checks, lint, tests
+pnpm format       # Prettier
+pnpm build        # build the web UI into web/out
 ```
 
-The receivers and audio need Linux, Shairport Sync and ffmpeg, so they run
-in the container. For the HTTP side (UI, API, public listener) on a laptop:
+AirPlay and audio need Linux, Shairport Sync and ffmpeg, so they run in the container. The
+HTTP side (web UI, API, public listener) also runs on a laptop:
 
 ```bash
 pnpm build
 DATA_DIR=./data RUN_DIR=/tmp/avb MANAGE_RECEIVERS=false pnpm start
 ```
 
-To work on the UI with hot reload, run `next dev` against a running bridge
-(local as above, or on another host). The dev server proxies `/api` to it;
-`UI_DEV_ORIGIN` lets the bridge accept the dev server's writes:
+To work on the UI with hot reload, point the Next.js dev server at a running bridge:
 
 ```bash
 UI_DEV_ORIGIN=http://localhost:3000 DATA_DIR=./data RUN_DIR=/tmp/avb MANAGE_RECEIVERS=false pnpm start
 BRIDGE_URL=http://localhost:8098 pnpm dev:web
 ```
 
-In production the UI is a static export served by the bridge itself, on the
-same origin as the API; no Next.js server runs. Its CSP lists the hashes of
-the page's inline scripts instead of allowing inline scripts in general.
+| Folder      | What's inside                                                                        |
+| ----------- | ------------------------------------------------------------------------------------ |
+| `src/`      | The bridge: AirPlay receivers, audio pipeline, Alexa control, public stream, LAN API |
+| `test/`     | Tests (Node's test runner), mirroring `src/`                                         |
+| `web/`      | The web UI                                                                           |
+| `SETUP.md`  | Setup guide, configuration reference, security model                                 |
+| `CLAUDE.md` | Architecture and code conventions, for humans and coding agents                      |
 
-`src/` layout:
-
-| Folder                             | Role                                                                                                            |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `main.ts`, `config.ts`, `state.ts` | Entry point, environment config, persisted settings                                                             |
-| `lib/`                             | Logging, child-process supervision                                                                              |
-| `bridge/`                          | Orchestration: receiver selection, triggering Echos, device mapping, session logic (start/stop/volume)          |
-| `airplay/`                         | Shairport Sync per Echo, PCM → MP3 broadcast, dbus/Avahi/NQPTP, receiver events over loopback MQTT, host checks |
-| `alexa/`                           | Amazon login and commands (alexa-remote2), generated skill code                                                 |
-| `public/`                          | Public stream listener and its checks (signed URLs, home IP, client IP), URL check                              |
-| `ui/`                              | LAN API, UI file serving, API types shared with `web/`                                                          |
-
-Tests in `test/` mirror this layout.
-
-## Status
-
-Personal project, not affiliated with Amazon or Apple. It relies on
-Amazon's unofficial web API, which can change without notice.
+Contributions are welcome. Please run `pnpm check` before opening a pull request.
