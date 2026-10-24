@@ -30,5 +30,4 @@ services:
 
 volumes:
   data:
-    # Fixed, so a Portainer stack under any name keeps the existing data.
     name: alexa-via-airplay_data

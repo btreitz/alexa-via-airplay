@@ -115,7 +115,7 @@ BRIDGE_URL=http://localhost:8098 pnpm dev:web
 - Changing the stream URL format or signing breaks every pasted skill; the user would have
   to paste the code again.
 - Amazon's API used by `alexa-remote2` is unofficial. Keep its version pinned.
-- `compose.yaml` passes each user-facing environment variable explicitly (`VAR: ${VAR:-}`).
+- `docker-compose.yml` passes each user-facing environment variable explicitly (`VAR: ${VAR:-}`).
   A new variable must be added there and to `.env.example`; empty values count as unset.
 
 ## Never commit

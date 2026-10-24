@@ -70,7 +70,7 @@ The address won't work until the bridge runs; that's the next step.
 
 ## Step 2: Start the bridge
 
-Deploy [`compose.yaml`](compose.yaml) from this repository on your Docker machine, for example as a Portainer stack from this Git repository, or with:
+Deploy [`docker-compose.yml`](docker-compose.yml) from this repository on your Docker machine, for example as a Portainer stack from this Git repository, or with:
 
 ```bash
 git clone https://github.com/btreitz/alexa-via-airplay.git
