@@ -70,18 +70,17 @@ The address won't work until the bridge runs; that's the next step.
 
 ## Step 2: Start the bridge
 
-On your Docker machine:
+Deploy [`compose.yaml`](compose.yaml) from this repository on your Docker machine, for example as a Portainer stack from this Git repository, or with:
 
 ```bash
 git clone https://github.com/btreitz/alexa-via-airplay.git
 cd alexa-via-airplay
-echo "PUBLIC_BIND=127.0.0.1" > .env
 docker compose up -d --build
 ```
 
-`PUBLIC_BIND=127.0.0.1` keeps the stream port off your network when your tunnel or proxy runs on the same machine. If it runs elsewhere, leave it out. The first build takes a few minutes.
+The first build takes a few minutes.
 
-**With Portainer:** create a stack from this Git repository (compose path `compose.yaml`), add the environment variable `PUBLIC_BIND=127.0.0.1` if it applies, and deploy.
+If your tunnel or proxy runs on the same machine, set the environment variable `PUBLIC_BIND=127.0.0.1`. It keeps the stream port off your network. Everything else has working defaults; see [Configuration and ports](#configuration-and-ports).
 
 ## Step 3: Finish in the web UI
 
@@ -118,7 +117,7 @@ Start with **Diagnostics** in the web UI: it shows the startup checks, the publi
 <details id="other-ways-to-publish-the-port">
 <summary><strong>Other ways to publish the port</strong></summary>
 
-Any reverse proxy with a valid certificate works: Nginx Proxy Manager, Caddy, Traefik, Tailscale Funnel and others. Point a public hostname to `http://<bridge host>:8099`, turn off response buffering (Nginx: `proxy_buffering off;`), and tell the bridge in `.env` which header carries the real client address and which proxy may set it:
+Any reverse proxy with a valid certificate works: Nginx Proxy Manager, Caddy, Traefik, Tailscale Funnel and others. Point a public hostname to `http://<bridge host>:8099`, turn off response buffering (Nginx: `proxy_buffering off;`), and tell the bridge with these environment variables which header carries the real client address and which proxy may set it:
 
 ```bash
 CLIENT_IP_HEADER=x-real-ip           # or x-forwarded-for
@@ -129,10 +128,10 @@ If cloudflared runs on another machine, point the tunnel to `http://<bridge host
 
 </details>
 
-<details>
+<details id="configuration-and-ports">
 <summary><strong>Configuration and ports</strong></summary>
 
-The container uses host networking, so these are ports on your server. Change them in `.env` (or the Portainer stack's environment variables) if they're taken; [`.env.example`](.env.example) lists every option.
+All configuration is optional and set through environment variables; [`.env.example`](.env.example) lists every option. The compose file passes on the variables from a `.env` file next to it or from a Portainer stack. The container uses host networking, so these are ports on your server; change them if they're taken:
 
 | Port         | Variable            | Purpose                               |
 | ------------ | ------------------- | ------------------------------------- |
