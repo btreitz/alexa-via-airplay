@@ -50,41 +50,18 @@ flowchart LR
 
 ## Step 1: Get a public HTTPS address
 
-You'll create a Cloudflare Tunnel: a small program on your server that connects out to Cloudflare, so your router needs no open ports.
+Your Echos need to reach the bridge's stream port, **8099**, through a public HTTPS address. Any setup works as long as:
 
-1. In the [Cloudflare dashboard](https://dash.cloudflare.com), open **Zero Trust → Networks → Tunnels** and choose **Create a tunnel**. Pick **Cloudflared** and give it a name, e.g. `airplay`.
-2. On the next screen, copy the **token**: the long string after `--token`, starting with `eyJ`. Keep it private.
-3. Add a **public hostname**:
-   - Subdomain: e.g. `airplay`, plus your domain
-   - Service type: **HTTP**
-   - URL: **`localhost:8099`**
-4. On your server, start cloudflared with that token. Save this as `compose.yaml` in a new folder, e.g. `~/cloudflared`:
+- the address has a valid certificate,
+- it forwards to `http://<bridge host>:8099`,
+- and it stays the same, since it ends up in your Alexa skill.
 
-   ```yaml
-   services:
-     cloudflared:
-       image: cloudflare/cloudflared:2026.10.1
-       restart: unless-stopped
-       network_mode: host
-       command: tunnel --no-autoupdate run
-       environment:
-         TUNNEL_TOKEN: ${TUNNEL_TOKEN}
-   ```
+How you get there is up to you. If you don't have a favourite yet, a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/) is the easiest: free, no open ports on your router, and you run `cloudflared` however you like (Docker, Portainer, a system service). Give the tunnel a public hostname like `airplay.<your domain>` with the service **HTTP** and the URL **`localhost:8099`** (if cloudflared runs on the same machine as the bridge). For a reverse proxy instead, see [Other ways to publish the port](#other-ways-to-publish-the-port).
 
-   Then, in that folder:
-
-   ```bash
-   echo "TUNNEL_TOKEN=<your token>" > .env
-   docker compose up -d
-   ```
-
-   In Portainer, create a stack from the same file instead and add `TUNNEL_TOKEN` as an
-   environment variable.
-
-Your public address is now `https://airplay.<your domain>`. It won't work until the bridge runs; that's the next step.
+The address won't work until the bridge runs; that's the next step.
 
 > [!IMPORTANT]
-> **Use one subdomain level only**, like `airplay.example.com`. Cloudflare's free
+> **With Cloudflare, use one subdomain level only**, like `airplay.example.com`. The free
 > certificate doesn't cover `airplay.home.example.com`, and Amazon rejects addresses
 > without a valid certificate.
 >
@@ -93,7 +70,7 @@ Your public address is now `https://airplay.<your domain>`. It won't work until 
 
 ## Step 2: Start the bridge
 
-On the same server:
+On your Docker machine:
 
 ```bash
 git clone https://github.com/btreitz/alexa-via-airplay.git
@@ -102,9 +79,9 @@ echo "PUBLIC_BIND=127.0.0.1" > .env
 docker compose up -d --build
 ```
 
-`PUBLIC_BIND=127.0.0.1` keeps the stream port off your network, since only cloudflared on the same machine needs it. The first build takes a few minutes.
+`PUBLIC_BIND=127.0.0.1` keeps the stream port off your network when your tunnel or proxy runs on the same machine. If it runs elsewhere, leave it out. The first build takes a few minutes.
 
-**With Portainer:** create a stack from this Git repository (compose path `compose.yaml`), add the environment variable `PUBLIC_BIND=127.0.0.1`, and deploy.
+**With Portainer:** create a stack from this Git repository (compose path `compose.yaml`), add the environment variable `PUBLIC_BIND=127.0.0.1` if it applies, and deploy.
 
 ## Step 3: Finish in the web UI
 
