@@ -4,6 +4,7 @@ services:
   bridge:
     build: .
     image: alexa-via-airplay:local
+    pull_policy: build
     restart: unless-stopped
     # AirPlay discovery (mDNS) and NQPTP's UDP 319/320 need the host network.
     network_mode: host
