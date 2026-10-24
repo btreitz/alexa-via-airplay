@@ -131,7 +131,7 @@ If cloudflared runs on another machine, point the tunnel to `http://<bridge host
 <details id="configuration-and-ports">
 <summary><strong>Configuration and ports</strong></summary>
 
-All configuration is optional and set through environment variables; [`.env.example`](.env.example) lists every option. The compose file passes on the variables from a `.env` file next to it or from a Portainer stack. The container uses host networking, so these are ports on your server; change them if they're taken:
+All configuration is optional and set through environment variables; [`.env.example`](.env.example) lists every option. The container uses host networking, so these are ports on your server; change them if they're taken:
 
 | Port         | Variable            | Purpose                               |
 | ------------ | ------------------- | ------------------------------------- |

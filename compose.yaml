@@ -11,11 +11,22 @@ services:
       - SYS_NICE
     volumes:
       - data:/data
-    env_file:
-      - path: .env
-        required: false
-      - path: stack.env
-        required: false
+    environment:
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      PUBLIC_BIND: ${PUBLIC_BIND:-}
+      PUBLIC_PORT: ${PUBLIC_PORT:-}
+      UI_BIND: ${UI_BIND:-}
+      UI_PORT: ${UI_PORT:-}
+      ALEXA_PROXY_PORT: ${ALEXA_PROXY_PORT:-}
+      AIRPLAY_BASE_PORT: ${AIRPLAY_BASE_PORT:-}
+      EVENT_BUS_PORT: ${EVENT_BUS_PORT:-}
+      CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      PUBLIC_IP_TRACE_URL: ${PUBLIC_IP_TRACE_URL:-}
+      PUBLIC_IP_REFRESH_SECONDS: ${PUBLIC_IP_REFRESH_SECONDS:-}
+      PUBLIC_IP_V6_PREFIX: ${PUBLIC_IP_V6_PREFIX:-}
+      AVAHI_INTERFACES: ${AVAHI_INTERFACES:-}
+      LOG_LEVEL: ${LOG_LEVEL:-}
 
 volumes:
   data:
