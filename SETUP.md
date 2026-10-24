@@ -142,6 +142,8 @@ All configuration is optional and set through environment variables; [`.env.exam
 | 319, 320/udp |                     | AirPlay 2 timing                      |
 | 5353/udp     |                     | Speaker discovery (mDNS)              |
 
+Your settings, the Amazon sign-in and the signing secret are stored in the Docker volume `alexa-via-airplay_data`. To keep them in a folder on the host instead, set `DATA_PATH`, e.g. `/opt/appdata/alexa-via-airplay/data`.
+
 </details>
 
 <details>

@@ -10,7 +10,7 @@ services:
     cap_add:
       - SYS_NICE
     volumes:
-      - data:/data
+      - ${DATA_PATH:-data}:/data
     environment:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       PUBLIC_BIND: ${PUBLIC_BIND:-}
