@@ -1,0 +1,15 @@
+diff --git a/lib/proxy.js b/lib/proxy.js
+index 8d459a153288c5a43d29af399e88f15fa800e88a..ec16cb7af2fccfd803712bffc43012b8c94aedca 100644
+--- a/lib/proxy.js
++++ b/lib/proxy.js
+@@ -423,6 +423,10 @@ function initAmazonProxy(_options, callbackCookie, callbackListening) {
+     }
+ 
+     function onProxyRes(proxyRes, req, res) {
++        const csp = proxyRes.headers && proxyRes.headers['content-security-policy'];
++        if (csp) {
++            proxyRes.headers['content-security-policy'] = String(csp).replace(/upgrade-insecure-requests;?/gi, '');
++        }
+         const url = req.originalUrl || req.url;
+         if (url.endsWith('.ico') || url.endsWith('.js') || url.endsWith('.ttf') || url.endsWith('.svg') || url.endsWith('.png') || url.endsWith('.appcache')) return;
+         if (url.startsWith('/ap/uedata')) return;

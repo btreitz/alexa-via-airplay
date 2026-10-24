@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  alexa-cookie2@5.0.6: b86b4ced8ae8bc6e1ba76be0c7a389e5d450146b2d496b280e539df4f6497ad5
+
 importers:
 
   .:
@@ -5723,7 +5726,7 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
-  alexa-cookie2@5.0.6:
+  alexa-cookie2@5.0.6(patch_hash=b86b4ced8ae8bc6e1ba76be0c7a389e5d450146b2d496b280e539df4f6497ad5):
     dependencies:
       cookie: 0.6.0
       express: 4.22.3
@@ -5738,7 +5741,7 @@ snapshots:
 
   alexa-remote2@8.1.1:
     dependencies:
-      alexa-cookie2: 5.0.6
+      alexa-cookie2: 5.0.6(patch_hash=b86b4ced8ae8bc6e1ba76be0c7a389e5d450146b2d496b280e539df4f6497ad5)
       extend: 3.0.2
       https: 1.0.0
       querystring: 0.2.1

@@ -9,6 +9,7 @@ RUN corepack enable
 WORKDIR /build
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches patches
 COPY web/package.json web/
 RUN pnpm install --frozen-lockfile
 
@@ -16,7 +17,7 @@ COPY src src
 COPY web web
 RUN pnpm --filter @alexa-via-airplay/web build
 
-RUN mkdir /prod && cp package.json pnpm-lock.yaml pnpm-workspace.yaml /prod/ \
+RUN mkdir /prod && cp -r package.json pnpm-lock.yaml pnpm-workspace.yaml patches /prod/ \
  && mkdir /prod/web && cp web/package.json /prod/web/ \
  && cd /prod && pnpm install --prod --frozen-lockfile --filter alexa-via-airplay
 
